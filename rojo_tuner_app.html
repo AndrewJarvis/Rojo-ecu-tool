@@ -1,0 +1,1286 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ROJO Tuner</title>
+<style>
+  :root {
+    --bg:#f3f4f6; --card:#ffffff; --text:#1b1d21; --muted:#667085; --line:#e3e6eb;
+    --accent:#c8102e; --accent-text:#ffffff; --ok:#15803d; --warn:#b45309; --bad:#b42318;
+    --chip:#eef0f4; --mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg:#121418; --card:#1b1e24; --text:#e8eaee; --muted:#9aa3b2; --line:#2a2f38;
+      --accent:#ff4d63; --accent-text:#1a0a0d; --ok:#4ade80; --warn:#fbbf24; --bad:#f87171;
+      --chip:#262b33;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin:0; background:var(--bg); color:var(--text);
+    font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  header { display:flex; align-items:center; gap:10px; padding:10px 16px; background:var(--card);
+    border-bottom:1px solid var(--line); position:sticky; top:0; z-index:5; flex-wrap:wrap; }
+  .brand { font-weight:800; letter-spacing:.5px; font-size:18px; }
+  .brand span { color:var(--accent); }
+  .pill { padding:3px 10px; border-radius:999px; font-size:12px; font-weight:600; background:var(--chip); color:var(--muted); }
+  .pill.on { background:color-mix(in srgb, var(--ok) 18%, transparent); color:var(--ok); }
+  .pill.warn { background:color-mix(in srgb, var(--warn) 20%, transparent); color:var(--warn); }
+  .pill.bad { background:color-mix(in srgb, var(--bad) 18%, transparent); color:var(--bad); }
+  .spacer { flex:1; }
+  button, select { font:inherit; border:1px solid var(--line); background:var(--card); color:var(--text);
+    padding:7px 14px; border-radius:8px; cursor:pointer; }
+  select { padding:7px 8px; }
+  button:hover:not(:disabled) { border-color:var(--muted); }
+  button:disabled { opacity:.45; cursor:not-allowed; }
+  button.primary { background:var(--accent); border-color:var(--accent); color:var(--accent-text); font-weight:700; }
+  button.small { padding:3px 9px; font-size:12px; }
+  button.linklike { border:0; background:none; color:var(--muted); text-decoration:underline; padding:0 4px; }
+  main { max-width:1180px; margin:0 auto; padding:16px; display:grid; gap:14px; grid-template-columns: repeat(12, 1fr); }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px 16px; }
+  .card h2 { margin:0 0 10px; font-size:13px; text-transform:uppercase; letter-spacing:.8px; color:var(--muted); }
+  .c12 { grid-column: span 12; } .c8 { grid-column: span 8; } .c7 { grid-column: span 7; }
+  .c5 { grid-column: span 5; } .c4 { grid-column: span 4; }
+  @media (max-width: 900px) { .c8,.c7,.c5,.c4 { grid-column: span 12; } }
+  .banner { grid-column: span 12; padding:10px 14px; border-radius:10px; border:1px solid var(--line); }
+  .banner.bad { border-color:var(--bad); color:var(--bad); }
+  .banner.warn { border-color:var(--warn); color:var(--warn); }
+  .tiles { display:grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap:10px; }
+  .tile { background:var(--chip); border-radius:10px; padding:8px 12px; min-width:0; }
+  .tile .k { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; }
+  .tile .v { font-size:22px; font-weight:700; font-variant-numeric: tabular-nums; }
+  .tile .u { font-size:12px; font-weight:500; color:var(--muted); margin-left:3px; }
+  .tile.big { grid-column: span 2; }
+  .tile.big .v { font-size:38px; }
+  .bar { height:8px; border-radius:6px; background:var(--line); overflow:hidden; margin-top:6px; }
+  .bar > i { display:block; height:100%; width:0; background:var(--accent); transition: width .25s; }
+  canvas { width:100%; height:190px; display:block; }
+  .legend { display:flex; gap:14px; font-size:12px; color:var(--muted); margin-top:4px; }
+  .legend b { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:5px; vertical-align:-1px; }
+  label { display:block; font-size:12px; color:var(--muted); margin:10px 0 4px; }
+  input[type=number], input[type=text] { font:inherit; padding:7px 10px; border-radius:8px; border:1px solid var(--line);
+    background:var(--bg); color:var(--text); width:130px; }
+  input[type=text] { width:100%; font-family:var(--mono); }
+  .row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .hint { color:var(--muted); font-size:12px; }
+  .modes { display:flex; gap:8px; flex-wrap:wrap; }
+  .modes label { margin:0; display:flex; align-items:center; gap:6px; padding:7px 12px; border:1px solid var(--line);
+    border-radius:8px; color:var(--text); font-size:14px; cursor:pointer; }
+  .modes input { accent-color: var(--accent); }
+  .actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:14px; }
+  table { width:100%; border-collapse:collapse; }
+  td, th { text-align:left; padding:5px 6px; border-bottom:1px solid var(--line); font-size:13px; vertical-align:top; }
+  th { color:var(--muted); font-weight:600; font-size:12px; }
+  .kv { display:grid; grid-template-columns: auto 1fr; gap:3px 14px; font-size:13px; }
+  .kv span:nth-child(odd) { color:var(--muted); }
+  .kv span:nth-child(even) { word-break:break-all; }
+  dialog { border:1px solid var(--line); border-radius:12px; background:var(--card); color:var(--text);
+    padding:18px 20px; max-width:480px; width:calc(100% - 32px); }
+  dialog.wide { max-width:820px; max-height:88vh; overflow:auto; }
+  dialog::backdrop { background: rgba(0,0,0,.55); }
+  dialog h3 { margin:0 0 8px; }
+  dialog .ul { margin:8px 0; padding:8px 12px; background:var(--chip); border-radius:8px; font-family:var(--mono); font-size:13px; }
+  dialog .warn { color:var(--warn); font-size:13px; margin:8px 0; }
+  .doc h3 { margin:18px 0 6px; font-size:15px; }
+  .doc h4 { margin:12px 0 4px; font-size:13px; }
+  .doc p, .doc li { font-size:13px; }
+  .doc ul, .doc ol { padding-left:20px; margin:6px 0; }
+  .doc table { margin:6px 0; }
+  .doc .note { background:var(--chip); border-radius:8px; padding:8px 12px; margin:8px 0; }
+  .terms { max-height:48vh; overflow:auto; border:1px solid var(--line); border-radius:8px; padding:6px 14px; margin:10px 0; }
+  .terms p { margin:8px 0; font-size:13px; }
+  .check { display:flex; gap:8px; align-items:flex-start; font-size:14px; color:var(--text); margin:10px 0; }
+  .check input { margin-top:3px; accent-color:var(--accent); }
+  .donate { display:flex; gap:16px; flex-wrap:wrap; align-items:flex-start; }
+  .donate .coin { background:var(--chip); border-radius:10px; padding:8px 12px; max-width:100%; }
+  .donate .addr { font-family:var(--mono); font-size:12px; word-break:break-all; margin:4px 0; }
+  .dots { display:flex; gap:8px; }
+  .dot { display:inline-block; width:20px; height:20px; border-radius:50%; background:var(--line); border:1px solid var(--muted); }
+  .dot.current { background:var(--bad); border-color:var(--bad); }
+  .dot.done { background:var(--ok); border-color:var(--ok); }
+  .learnrow { display:flex; gap:16px; align-items:center; margin:10px 0; flex-wrap:wrap; }
+  .learnstatus { font-size:16px; font-weight:700; }
+  a.btn.alt { background:var(--card); color:var(--text); border:1px solid var(--line); font-weight:500; }
+  a.btn.small { padding:4px 10px; font-size:12px; }
+  .doc a { color:var(--accent); }
+  a.btn { display:inline-block; text-decoration:none; background:var(--accent); color:var(--accent-text); font-weight:700; padding:8px 16px; border-radius:8px; }
+  .toast { position:fixed; bottom:16px; left:50%; transform:translateX(-50%); background:var(--text); color:var(--bg);
+    padding:9px 16px; border-radius:10px; font-size:13px; opacity:0; pointer-events:none; transition:opacity .2s; z-index:20; max-width:90%; }
+  .toast.show { opacity:1; }
+  footer { max-width:1180px; margin:0 auto; padding:0 16px 28px; color:var(--muted); font-size:12px; }
+  code { font-family:var(--mono); background:var(--chip); padding:1px 5px; border-radius:4px; }
+</style>
+</head>
+<body>
+
+<!-- =====================================================================================
+     EDIT HERE: your donation details. Leave a value empty ('' or []) to hide it.
+     Only https:// links are shown. Never put anything secret here - this file gets shared.
+     ===================================================================================== -->
+<script>
+// The project page (Arduino sketch and updates). Shown as a link; only https:// links are used.
+const REPO_URL = 'https://github.com/AndrewJarvis/Rojo-ecu-tool/tree/main';
+
+const DONATE = {
+  message: 'If this saved you a trip to the dealer, a donation is very welcome. It is entirely optional.',
+  paypal: '',          // e.g. 'https://www.paypal.com/paypalme/YourName'
+  crypto: [            // e.g. { coin: 'Bitcoin (BTC)', address: 'bc1q...' }, { coin: 'Ethereum (ETH)', address: '0x...' }
+  ]
+};
+</script>
+
+<header>
+  <div class="brand">ROJO <span>Tuner</span></div>
+  <div id="pill" class="pill">Disconnected</div>
+  <div id="ecuInfo" class="hint"></div>
+  <div class="spacer"></div>
+  <button id="btnManual">Manual</button>
+  <select id="selBaud" title="Serial speed. The sketch uses 115200 - only change this if you changed the sketch.">
+    <option value="115200">115200 baud</option>
+    <option value="57600">57600 baud</option>
+    <option value="250000">250000 baud</option>
+    <option value="500000">500000 baud</option>
+    <option value="9600">9600 baud</option>
+  </select>
+  <button id="btnConnect" class="primary">Connect</button>
+  <button id="btnDisconnect" hidden>Disconnect</button>
+</header>
+
+<main>
+  <div id="unsupported" class="banner bad" hidden>
+    This browser can't talk to serial ports. Open this file in <b>Google Chrome</b> or <b>Microsoft Edge</b> (Windows, Linux or Mac).
+    If you are already using one of them and still see this, see the Manual (section 4).
+  </div>
+  <div id="noLink" class="banner warn" hidden></div>
+
+  <section class="card c8">
+    <h2>Live data</h2>
+    <div class="tiles">
+      <div class="tile big"><div class="k">Engine speed</div><div class="v"><span id="vRpm">–</span><span class="u">rpm</span></div></div>
+      <div class="tile"><div class="k">Throttle</div><div class="v"><span id="vThr">–</span><span class="u">%</span></div><div class="bar"><i id="barThr"></i></div></div>
+      <div class="tile"><div class="k">Fuel factor (setting)</div><div class="v"><span id="vFuel">–</span></div><div class="hint">1.000 = unchanged · from last read</div></div>
+      <div class="tile"><div class="k">Fuel correction (?)</div><div class="v"><span id="vCorr">–</span></div><div class="hint">live · moves with throttle</div></div>
+      <div class="tile"><div class="k">Battery</div><div class="v"><span id="vBat">–</span><span class="u">V</span></div></div>
+      <div class="tile"><div class="k">Cylinder head</div><div class="v"><span id="vHead">–</span><span class="u">°C</span></div></div>
+      <div class="tile"><div class="k">Intake air (?)</div><div class="v"><span id="vAir">–</span><span class="u">°C</span></div></div>
+      <div class="tile"><div class="k">O2 sensor</div><div class="v"><span id="vO2">–</span><span class="u">mV</span></div></div>
+      <div class="tile"><div class="k">Ignition angle (?)</div><div class="v"><span id="vIgn">–</span><span class="u">°</span></div></div>
+      <div class="tile"><div class="k">Run mode</div><div class="v" style="font-size:18px"><span id="vMode">–</span></div></div>
+      <div class="tile"><div class="k">ECU lock</div><div class="v" style="font-size:18px"><span id="vLock">–</span></div></div>
+    </div>
+    <div class="hint" style="margin-top:8px">Unidentified values: <span id="vOther">–</span></div>
+  </section>
+
+  <section class="card c4">
+    <h2>ECU</h2>
+    <div class="kv">
+      <span>Model</span><span id="kModel">–</span>
+      <span>Sketch</span><span id="kSketch">–</span>
+      <span>Protocol</span><span id="kProto">–</span>
+      <span>Software</span><span id="kSw">–</span>
+      <span>Ignition-on count</span><span id="kStarts">–</span>
+      <span>Total run time</span><span id="kRun">–</span>
+      <span>Live data</span><span id="kLive">–</span>
+    </div>
+    <div class="actions" style="margin-top:10px">
+      <a id="lnkRepo" class="btn alt small" target="_blank" rel="noopener noreferrer">Arduino sketch (GitHub)</a>
+      <button id="btnTerms" class="small">Terms</button>
+    </div>
+  </section>
+
+  <section class="card c12">
+    <h2>Logs</h2>
+    <div class="actions" style="margin-top:0">
+      <button id="btnLog">Log live data</button>
+      <button id="btnDiag">Log everything (diagnostics)</button>
+    </div>
+    <div class="hint" style="margin-top:8px"><b>Log live data</b> records engine speed, throttle, temperatures, battery, O2, the fuel factor setting and the rest as a CSV file - press it to start, press again to stop and save. Columns m2 to m5 are values the ECU sends that aren't identified yet (m4 is the live fuel correction and moves with the throttle). <b>Log everything</b> saves one text file for diagnosis: the ECU details, current settings and fault codes, a fresh raw snapshot, and every line exchanged with the Arduino since you connected.</div>
+  </section>
+
+  <section class="card c7">
+    <h2>Settings</h2>
+    <div class="row">
+      <div>
+        <label for="inIdle">Target idle (rpm)</label>
+        <input id="inIdle" type="number" min="1200" max="2000" step="50">
+        <div class="hint">1200 – 2000 · ECU: <b id="curIdle">–</b></div>
+      </div>
+      <div>
+        <label for="inLimit">Rev limit (rpm)</label>
+        <input id="inLimit" type="number" min="3000" max="10000" step="100">
+        <div class="hint">3000 – 10000 · ECU: <b id="curLimit">–</b></div>
+      </div>
+    </div>
+    <label>Run mode <span class="hint">(ECU: <b id="curMode">–</b>)</span></label>
+    <div class="modes">
+      <label><input type="radio" name="mode" value="0"> 0 · Comfort</label>
+      <label><input type="radio" name="mode" value="1"> 1 · Sport</label>
+      <label><input type="radio" name="mode" value="2"> 2 · Competition</label>
+    </div>
+    <div class="hint" style="margin-top:4px">Comfort mode initial setting from dealer used for run in and fuel economy. Idle and rev limit values don't change with the modes.</div>
+    <label>Fuel factor</label>
+    <div><b id="curFuel">–</b> <span class="hint">· Used for adjusting fuel injection</span></div>
+    <label class="check" style="margin:8px 0 4px"><input type="checkbox" id="chkFuel" disabled> Enable fuel factor changes (advanced)</label>
+    <div id="fuelBox" hidden>
+      <input id="inFuel" type="number" min="1" max="3" step="0.005">
+      <span class="hint">1.000 – 3.000 · 1.000 = unchanged, higher = more fuel · ECU: <b id="curFuel2">–</b></span>
+    </div>
+
+    <div class="actions">
+      <button id="btnRead">Read from ECU</button>
+      <button id="btnApply" class="primary">Write changes…</button>
+      <button id="btnTest">Write-back test</button>
+    </div>
+    <div id="writeNote" class="hint" style="margin-top:8px"></div>
+
+    <h2 style="margin-top:18px">Baseline</h2>
+    <div class="hint">Saved starting values: <b id="baseText">–</b></div>
+    <div class="actions" style="margin-top:8px">
+      <button id="btnRestore">Restore baseline…</button>
+      <button id="btnSaveBase">Save current as baseline</button>
+    </div>
+  </section>
+
+  <section class="card c5">
+    <h2>Fault codes</h2>
+    <table>
+      <thead><tr><th>Type</th><th>Code</th><th>Meaning</th></tr></thead>
+      <tbody id="faultBody"><tr><td colspan="3" class="hint">Not read yet</td></tr></tbody>
+    </table>
+    <div class="actions"><button id="btnFaults">Read faults</button><button id="btnClearCodes">Clear codes…</button></div>
+    <div class="hint" style="margin-top:8px">Meanings come from the ROJO manual or the standard OBD list. Clearing codes isn't supported here.</div>
+
+    <h2 style="margin-top:18px">Throttle check</h2>
+    <div class="kv">
+      <span>Now</span><span id="tNow">–</span>
+      <span>Closed read</span><span id="tMin">–</span>
+      <span>Fully open read</span><span id="tMax">–</span>
+    </div>
+    <div id="tVerdict" class="hint" style="margin-top:6px">Open and close the throttle fully a few times, then press Stop.</div>
+    <div class="actions">
+      <button id="btnTpsStart">Start</button>
+      <button id="btnTpsStop" disabled>Stop</button>
+    </div>
+  </section>
+
+  <section class="card c12" id="learnCard">
+    <h2>Fast self-learning</h2>
+    <div id="learnElig" class="hint"></div>
+    <div class="learnrow">
+      <div class="dots" title="Learning points 1, 3, 4, 5 and 6: green = learned, red = learning now, grey = waiting">
+        <i id="lrnC1" class="dot"></i><i id="lrnC2" class="dot"></i><i id="lrnC3" class="dot"></i><i id="lrnC4" class="dot"></i><i id="lrnC5" class="dot"></i>
+      </div>
+      <div id="learnStatus" class="learnstatus">–</div>
+    </div>
+    <div class="hint" id="learnVals">–</div>
+    <div class="actions"><button id="btnLearn">Start fast-learning…</button></div>
+    <div class="hint" style="margin-top:8px">From the original app: fast-learning lets the engine reach its best state in the shortest time. Do it <b>with the bike stationary and unloaded - never on the road</b> - and with the engine fully warm (cylinder head temperature in the original app's green zone); it may stop the engine. Once started, the <b>ECU</b> decides when you are "in a learning point". Change engine speed or throttle slowly and steadily until the status says you are in a point, hold it until that point is learned, then look for the next. A valid O2 sensor reading is needed (0 mV means invalid). When all points are done, switch the ignition off. The original app does not publish the target speed or throttle for each point.</div>
+  </section>
+
+  <section class="card c12" id="donateCard" hidden>
+    <h2>Support this project</h2>
+    <div id="donateMsg" class="hint" style="margin-bottom:10px"></div>
+    <div class="donate" id="donateBody"></div>
+  </section>
+
+</main>
+
+<footer>
+  ROJO Tuner · unofficial hobby tool, not affiliated with ROJO or any bike maker · use at your own risk ·
+  <button id="btnTerms2" class="linklike">Terms &amp; disclaimer</button> ·
+  <button id="btnManual2" class="linklike">Manual</button><br>
+  Needs the matching <code>rojo_tuner.ino</code> sketch on the Arduino (get it from the GitHub link). Close PuTTY and the Arduino IDE's serial monitor first - only one program can use the port.
+</footer>
+
+<!-- ============================ dialogs ============================ -->
+<dialog id="dlg">
+  <h3 id="dlgTitle"></h3>
+  <div id="dlgBody"></div>
+  <div class="hint" style="margin-top:8px">Using this app is at your own risk - see the Terms.</div>
+  <div class="actions" style="justify-content:flex-end">
+    <button id="dlgCancel">Cancel</button>
+    <button id="dlgOk" class="primary">Write</button>
+  </div>
+</dialog>
+
+<dialog id="dlgTerms" class="wide">
+  <h3>Terms, disclaimer and waiver - please read</h3>
+  <div class="terms doc" id="termsBody"></div>
+  <div id="termsDone" class="hint" hidden></div>
+  <label class="check" id="termsCheckRow"><input type="checkbox" id="chkTerms"> I have read and understood the above, I am old enough to accept it where I live, and I accept it.</label>
+  <div class="actions" style="justify-content:flex-end">
+    <button id="termsNo">Close</button>
+    <button id="termsOk" class="primary" disabled>I accept</button>
+  </div>
+</dialog>
+
+
+<dialog id="dlgManual" class="wide">
+  <div class="row"><h3 style="margin:0">Manual</h3><div class="spacer"></div><button id="manualClose">Close</button></div>
+  <div class="doc" id="manualBody"></div>
+</dialog>
+<div id="toast" class="toast"></div>
+
+<!-- ============================ texts ============================ -->
+<template id="termsTpl">
+  <p><b>1. What this is.</b> ROJO Tuner is an unofficial, independent hobby tool. It is not made, approved, supported or endorsed by ROJO / Zhejiang Langjie Electronics, by any motorcycle manufacturer, or by anyone else whose names appear in it; names are used only to say which equipment it is meant to work with. It was built by studying how an existing app talks to an engine control unit (ECU), using the author's own bike. It may not work on your ECU.</p>
+  <p><b>2. Writing to an ECU is risky.</b> This app can change settings stored in your ECU (idle speed, rev limit, run mode and, if you switch the option on, the fuel factor) can erase its stored fault codes and history, and (on ECU software that supports it) can start the ECU's fast self-learning routine, which must only be run with the bike stationary and unloaded. Wrong or unsuitable settings, a loss of power or connection part-way through a write, a faulty cable, a software bug or an unexpected reaction of the ECU can cause poor running, stalling, loss of power, overheating, damage to the engine, ECU, wiring or battery, a bike that will not start, or an accident. Changes may void your warranty, may affect your insurance, and may make the vehicle illegal for road use or non-compliant with emissions or type-approval rules where you live (for example Euro 5). It is your responsibility to find out and obey the law.</p>
+  <p><b>3. Entirely at your own risk.</b> The software is provided "as is", without warranty of any kind, express or implied, including fitness for a particular purpose, accuracy or reliability. To the fullest extent the law allows, the author(s) and anyone who shares this file are not responsible for any loss, damage, injury, cost, fine or other consequence of using it, and you agree not to hold them responsible. You accept all risk to yourself, your property and other people. Nothing here removes any right, or limits any liability, that cannot lawfully be removed or limited (for example liability for death or personal injury caused by negligence, or for fraud).</p>
+  <p><b>4. Use it safely.</b> Keep the bike stationary, on a stand, in a safe place. Write settings only with the engine off and the battery well charged or on a charger. Never ride with a laptop or wiring connected, and keep wires away from hot or moving parts. Write down the original values first (the app also saves them). Change one thing at a time, in small steps, and stop if anything behaves unexpectedly. The built-in safeguards (for example refusing to write while the engine is running) reduce the risk but do not remove it, and you remain responsible for checking every change.</p>
+  <p><b>5. Not advice.</b> Nothing in this app, its manual or any message from its author is professional engineering, mechanical or legal advice. Fault-code meanings, mode names and other labels are best-effort and may be wrong for your bike.</p>
+  <p><b>6. Privacy.</b> The app runs entirely on your computer and does not send any data anywhere. Your saved baseline and your acceptance of these terms are kept in your browser's local storage. Donation links open third-party sites, which have their own rules.</p>
+  <p><b>7. Donations</b> are voluntary gifts. They do not buy support, a warranty, refunds, features or any other right.</p>
+  <p><b>8. Who may use it.</b> You confirm that you own the vehicle or have its owner's permission, and that you are able to accept these terms where you live.</p>
+  <p class="hint">Terms version 2026-10-18.</p>
+</template>
+
+<template id="manualTpl">
+  <h3>1. What you need</h3>
+  <ul>
+    <li>An <b>Arduino Nano</b> (5 V, ATmega328P) and an <b>MCP2515 CAN module</b> (the common blue board with an 8 MHz crystal), jumper wires, and access to the bike's ECU connector.</li>
+    <li>A <b>USB cable that carries data</b> (not a charge-only lead).</li>
+    <li>A computer running <b>Google Chrome or Microsoft Edge</b> - Windows, Linux or Mac. Firefox and Safari cannot use serial ports.</li>
+    <li>Tested on: ECU model <code>SX-W125-M-210416</code>, software number 402212071, CAN at 500 kbps. Other ROJO ECUs may behave differently.</li>
+    <li>What it does: live data, read and set <b>idle speed</b>, <b>rev limit</b> and <b>run mode</b>, read and <b>clear fault codes</b>, check the throttle, and (as an option you switch on) change the <b>fuel factor</b>. On ECU software below 400000000 it can also start and monitor the <b>fast self-learning</b>. What it does <b>not</b> do: fuel/ignition maps.</li>
+  </ul>
+
+  <h3>2. Wiring</h3>
+  <table>
+    <tr><th>MCP2515 module</th><th>Connects to</th></tr>
+    <tr><td>VCC</td><td>Nano 5V</td></tr>
+    <tr><td>GND</td><td>Nano GND</td></tr>
+    <tr><td>CS</td><td>Nano D10</td></tr>
+    <tr><td>SI (MOSI)</td><td>Nano D11</td></tr>
+    <tr><td>SO (MISO)</td><td>Nano D12</td></tr>
+    <tr><td>SCK</td><td>Nano D13</td></tr>
+    <tr><td>INT</td><td>not used</td></tr>
+    <tr><td>CANH</td><td>ECU connector: black/white wire</td></tr>
+    <tr><td>CANL</td><td>ECU connector: orange/black wire</td></tr>
+    <tr><td>GND (the module's other ground)</td><td>ECU connector: blue wire (signal ground)</td></tr>
+  </table>
+  <p>The colours are those of the ROJO connector on the tested bike (from the ROJO manual). Check yours before connecting. <b>Never connect the bike's red +12 V wires to the Nano or the module.</b> If the ECU does not answer, swapping CANH and CANL is harmless and often the fix.</p>
+  <div class="note"><b>Termination (J1 jumper).</b> A CAN bus needs 120 Ω at each end. With the ignition off and the module disconnected, measure between CANH and CANL at the ECU connector. About 120 Ω: the ECU has its own terminator, so <b>close J1</b> on the module (this is what worked on the tested bike). About 60 Ω: leave J1 open.<br>
+  <b>Crystal.</b> Read the silver crystal on the module. 8.000 needs nothing. If it says 16.000, change <code>MCP_8MHZ</code> to <code>MCP_16MHZ</code> near the top of the sketch.</div>
+
+  <h3>3. Put the sketch on the Arduino</h3>
+  <ol>
+    <li>Install the Arduino IDE from arduino.cc.</li>
+    <li>Open the project page on GitHub (<a data-repo target="_blank" rel="noopener noreferrer">the link in this app's ECU box and here</a>) and download <code>rojo_tuner.ino</code>. Put it inside a folder named <code>rojo_tuner</code> (the folder name must match the file name).</li>
+    <li>In the IDE: Sketch → Include Library → Manage Libraries, search <code>mcp2515</code>, install the one by <b>autowp</b>. If it is not listed, download the ZIP from github.com/autowp/arduino-mcp2515 and use Sketch → Include Library → Add .ZIP Library.</li>
+    <li>Tools → Board: <b>Arduino Nano</b>. Tools → Processor: <b>ATmega328P</b> (choose "Old Bootloader" if the upload fails - common on clones). Tools → Port: the Nano's port.</li>
+    <li>Click Upload. Then close the IDE's Serial Monitor so the port is free.</li>
+  </ol>
+
+  <h3>4. Connect</h3>
+  <h4>Windows</h4>
+  <p>Plug the Nano in. If no new COM port appears in Device Manager (Ports), install the CH340 driver (most clone Nanos use that chip).</p>
+  <h4>Linux (Ubuntu and similar)</h4>
+  <ul>
+    <li>Allow your user to use serial ports once: <code>sudo usermod -aG dialout $USER</code>, then log out and back in.</li>
+    <li>If the port disappears a moment after plugging in, the <code>brltty</code> package is grabbing CH340 chips: <code>sudo apt remove brltty</code>.</li>
+    <li>Use <b>Google Chrome</b> (the .deb from google.com/chrome). The Chromium snap often cannot reach serial ports.</li>
+    <li>The port shows up as <code>/dev/ttyUSB0</code> or <code>/dev/ttyACM0</code>.</li>
+  </ul>
+  <h4>Then, on either system</h4>
+  <ol>
+    <li>Open <code>rojo_tuner_app.html</code> in Chrome or Edge, accept the terms, click <b>Connect</b> and pick the Arduino's port.</li>
+    <li><b>The baud rate is set for you</b> (115200, which the sketch uses). The box next to Connect only matters if you changed the sketch.</li>
+    <li>Ignition on, kill switch in run. The status turns green and the ECU model appears.</li>
+  </ol>
+  <p>If Chrome says serial is unsupported even though you are using Chrome, serve the file locally: in its folder run <code>python3 -m http.server 8000</code> and open <code>http://localhost:8000/rojo_tuner_app.html</code>.</p>
+
+  <h3>5. Using the app</h3>
+  <ul>
+    <li><b>Live data:</b> engine speed, throttle, battery, cylinder head temperature, O2 sensor, run mode and lock state, including two fuel numbers: <b>Fuel factor (setting)</b> is the value you can change (from the last read, it does not move with the throttle), and <b>Fuel correction (?)</b> is a live value the ECU sends that moves when the throttle moves; what exactly it is has not been confirmed. Labels with (?) are best guesses.</li>
+    <li><b>Read from ECU:</b> shows what the ECU currently has. The first time an ECU is read, its idle, rev limit and mode are saved as your <b>baseline</b>.</li>
+    <li><b>Write changes…:</b> change the boxes, press the button, check the list in the confirmation window, confirm. The app writes, re-reads, and tells you if the ECU reports the new values (verified).</li>
+    <li><b>Write-back test:</b> writes the values the ECU already has. Nothing should change. Run it first to prove the write path works.</li>
+    <li><b>Throttle check:</b> open and close the throttle fully a few times, then Stop. A good calibration reads about 0 % closed and about 100 % open.</li>
+    <li><b>Fuel factor (optional):</b> tick <b>Enable fuel factor changes</b>, read the warning, and a fuel box appears. 1.000 means unchanged and higher adds fuel (up to 3.000); it is meant for things like a replaced or modified injector. It is switched off again every time you connect, and it is included in Restore baseline only while it is switched on. Needs the latest sketch (v3.5).</li>
+    <li><b>Clear codes…:</b> erases the stored fault codes and history in the ECU. A fault that is still present comes back, so it does not fix anything on its own, and the history can help a mechanic - use Log everything (diagnostics) first if you want a record.</li>
+    <li><b>Writing is switched off</b> while the engine is running (rpm 50 or more), while the ECU reports itself locked, or with no live data.</li>
+    <li><b>Logs:</b> <b>Log live data</b> records the live values as a CSV file - press it to start, press again to stop and save. <b>Log everything (diagnostics)</b> saves one text file with the ECU details, settings, fault codes, a fresh raw snapshot and every line exchanged with the Arduino. Send that file when asking for help.</li>
+  </ul>
+
+  <h3>6. Run modes</h3>
+  <p>0 <b>Comfort</b>, 1 <b>Sport</b>, 2 <b>Competition</b>. Comfort is the initial setting from the dealer and is used for running in and fuel economy; on the author's bike it limited rpm in some or all gears. The maker does not document what Sport and Competition change (the author believes they alter the fuel tables and spark advance, but this has not been measured). Tests so far: the idle speed and rev limit values stay the same when the mode changes.</p>
+
+  <h3>7. Fast self-learning</h3>
+  <p>The ECU has a routine, called fast-learning in the original Android app, that lets the engine reach its best state in the shortest time. It is meant for the ECU's own recommended use, for example after the throttle has been recalibrated.</p>
+  <ul>
+    <li><b>Only some ECUs.</b> The original app treats ECU software numbers of 400000000 and above as "not implemented", and so does this tool: the Fast self-learning card shows whether yours is supported. The ECU the author built this on is 402212071, so the author could not test it. It is built from the original app's code.</li>
+    <li><b>Conditions (from the original app):</b> bike stationary and unloaded - <b>never on the road</b>; engine fully warm (cylinder head temperature in the green zone); it may stop the engine; when it says done, switch the ignition off. It needs a valid O2 sensor reading (0 mV means invalid).</li>
+    <li><b>How it goes:</b> press Start fast-learning…, confirm. Five circles show the learning points: <b>grey</b> waiting, <b>red</b> learning now, <b>green</b> learned. The status says "Not in learning point", "In learning point and doing learn" or "The learning of this point is done". The ECU decides when you are in a point, and the original app does not say which engine speed or throttle each point needs, so change the engine speed or throttle slowly and steadily until it says you are in a point, hold it until that point is learned, then look for the next. When all points are done the status says to close the power switch (ignition off).</li>
+    <li>The live-data CSV and the diagnostic log include the ECU mode (2 means learning), the learning point and the state bits, so you can review a session. Needs sketch v3.6 or newer.</li>
+  </ul>
+
+  <h3>8. Going back to your starting values</h3>
+  <p>Use <b>Restore baseline…</b>. The first time the app sees an ECU it saves that ECU's idle, rev limit and mode as the baseline. <b>Before you experiment</b>, make sure the ECU holds the values you want to return to, then press <b>Save current as baseline</b>.</p>
+  <p>This app cannot perform a real factory reset. The original Android app has a "Return to factory settings" button, but in the version this tool was built from it is not connected to anything. The ROJO paper manual describes a throttle-and-ignition procedure that relies on the ECU's lamps; on the author's ECU no lamp lit, so it could not be followed, and the author does not recommend repeating it blindly (it also re-calibrates the throttle, see section 9).</p>
+
+  <h3>9. Engine will not idle</h3>
+  <p>The ROJO manual's own checklist for stalling at idle (it says to start with the idle air screw) boils down to this. Work through it in order and change <b>one thing at a time</b>.</p>
+  <ol>
+    <li><b>Throttle check (in this app).</b> With the ignition on, press Start, open and close the throttle fully, press Stop. You want about 0 % closed and about 100 % open. If closed reads clearly above about 2 %, the ECU thinks the throttle is open and will not control idle. That can happen if the ECU's throttle calibration was disturbed.</li>
+    <li><b>Idle target.</b> Press Read from ECU. Put the idle target back to your baseline (the ECU's original was 1600 rpm). A target far from what the engine can physically do makes it hunt or stall.</li>
+    <li><b>Idle air screw</b> (the manual calls it the idle air quantity adjusting screw). It sits on the throttle body and sets how much air bypasses the closed throttle. Per the ROJO manual: <b>too little air → turn it counter-clockwise; too much air → turn it clockwise</b>. Do it with the engine <b>fully warm</b> (watch Cylinder head temperature in the app), in small steps (an eighth to a quarter turn), waiting several seconds after each, and watch Engine speed in the app. Write down where it started so you can return to it. Never force it against its seat.</li>
+    <li><b>Idle valve</b> (only if your throttle body has one - a small motor on the throttle body). Listen near it as you switch the ignition on: the manual says you should hear a click as it opens. Check its connector.</li>
+    <li><b>Air leaks.</b> A loose intake pipe, loose clamp screws or a bad O-ring let in extra air and upset idle.</li>
+    <li>Also on the manual's list: valve clearance too small, spark plug (should be a resistor type), engine oil level.</li>
+  </ol>
+  <p>Some ECUs have a blue indicator lamp that tells you if idle air is too low (fast flashing, about 4 per second) or too high (slow flashing, about 1 per second) once warm; off means correct. If your ECU shows no lamp, use the engine speed in the app instead.</p>
+
+  <h3>10. Troubleshooting</h3>
+  <table>
+    <tr><th>Problem</th><th>Try</th></tr>
+    <tr><td>No port in the list</td><td>Data-capable USB cable; CH340 driver (Windows); <code>dialout</code> group or <code>brltty</code> (Linux); close other programs using the port.</td></tr>
+    <tr><td>"No sketch answer"</td><td>Is <code>rojo_tuner.ino</code> uploaded? Is the baud box 115200? Press the Nano's reset button and reconnect.</td></tr>
+    <tr><td>"ECU not answering"</td><td>Ignition on and kill switch in run; check CANH/CANL (try swapping), the ground wire, J1, and the crystal setting.</td></tr>
+    <tr><td>Writing is off</td><td>Read the grey note under the buttons: engine running, ECU locked, or no live data yet.</td></tr>
+    <tr><td>"NO ACK" or MISMATCH after a write</td><td>Stop. Press Read from ECU to see what the ECU has. Check the battery voltage and wiring, then try again.</td></tr>
+    <tr><td>Engine will not idle</td><td>See section 9: throttle check, idle target back to baseline, idle air screw, idle valve, air leaks.</td></tr>
+    <tr><td>Fuel box or Clear codes says the sketch did not answer</td><td>The Arduino has an older sketch. Get the latest sketch from the GitHub link and upload it again (section 3).</td></tr>
+    <tr><td>Nothing, or strange characters, in the diagnostics log</td><td>The baud rate does not match the sketch (115200).</td></tr>
+  </table>
+
+  <h3>11. Using a terminal instead of the app</h3>
+  <p>The sketch talks plain text at <b>115200 baud, 8 data bits, no parity, 1 stop bit, no flow control</b>.</p>
+  <ul>
+    <li><b>Windows (PuTTY):</b> Connection type Serial, Serial line = your COM port, Speed 115200, then Session → Logging if you want a file.</li>
+    <li><b>Linux:</b> <code>screen /dev/ttyUSB0 115200</code> (leave with Ctrl-A then K) or <code>picocom -b 115200 /dev/ttyUSB0</code> (leave with Ctrl-A then Ctrl-X). To set the speed by hand: <code>stty -F /dev/ttyUSB0 115200</code>.</li>
+  </ul>
+  <p>Type a command and press Enter: <code>r</code> read settings, <code>d</code> live data, <code>x</code> raw live message, <code>l</code> live log on/off, <code>tps</code> throttle check, <code>same</code> write-back test, <code>idle N</code>, <code>limit N</code>, <code>mode N</code>, <code>fuelon</code> then <code>fuel F</code>, and <code>clear</code> (each asks you to type <code>y</code> to confirm), <code>h</code> help.</p>
+
+  <h3>12. Safety and terms</h3>
+  <p>Writing to an ECU can damage the engine or ECU and may make a vehicle illegal for road use. Engine off, battery charged, bike on a stand, small steps, write the old values down. Read the <b>Terms &amp; disclaimer</b> (button at the bottom of the page): by using this tool you accept them.</p>
+</template>
+
+
+<script>
+// ==== LOGIC BEGIN (no DOM in here, so it can be tested outside the browser) =============================
+const LIMITS = { idle: [1200, 2000], limit: [3000, 10000], mode: [0, 2], fuel: [1, 3] };
+const MODE_NAMES = ['Comfort', 'Sport', 'Competition'];
+const LIVE_HEADER = 'time,ms,rpm,throttle,m2,m3,m4,m5,o2_mV,battery,intake_air,cyl_head,runmode,locked,fuel_factor,ecu_mode,learn_point,learn_state';
+const modeName = (m) => (m == null ? '?' : m + ' ' + (MODE_NAMES[m] || ''));
+
+const FAULT_TEXT = {
+  P0505: 'Idle control system malfunction (standard OBD meaning)',
+  P0139: 'O2 sensor slow response, bank 1 sensor 2 (standard OBD meaning)',
+  P0509: 'Idle valve open circuit (manual: 2 flashes)',
+  P2505: 'ECU abnormal reset – check power/ground/fuse (manual: 3 flashes)',
+  P0335: 'Crank sensor signal open (manual: 4 flashes)',
+  P0336: 'Crank sensor signal unreliable (manual: 4 flashes)',
+  P0563: 'Supply voltage too high – rectifier (manual: 5 flashes)',
+  P0131: 'O2 sensor voltage low (manual: 6 flashes)',
+  P0132: 'O2 sensor voltage high (manual: 6 flashes)',
+  P0135: 'O2 sensor heater circuit (manual: 6 flashes)',
+  P0118: 'Cylinder head temp sensor high (manual: 7 flashes)',
+  P0117: 'Cylinder head temp sensor low (manual: 7 flashes)',
+  P0201: 'Injector open circuit (manual: 8 flashes)',
+  P0262: 'Injector short to supply (manual: 8 flashes)',
+  P0231: 'Fuel pump open circuit (manual: 9 flashes)',
+  P0232: 'Fuel pump short to supply (manual: 9 flashes)',
+  P2300: 'Ignition coil open circuit (manual: 10 flashes)',
+  P0122: 'Throttle position sensor low (manual: 11 flashes)',
+  P0123: 'Throttle position sensor high (manual: 11 flashes)',
+  P0113: 'Intake air temp sensor high (manual: 13 flashes)',
+  P0112: 'Intake air temp sensor low (manual: 13 flashes)',
+  P0607: 'ECU power transistor damaged (manual: 14 flashes)',
+  P0650: 'Fault lamp circuit',
+  P2195: 'O2 sensor stuck lean',
+  P2196: 'O2 sensor stuck rich'
+};
+
+// Problems the sketch reports when it refuses a command.
+const REFUSALS = [
+  /^no live data yet/, /^ECU reports LOCKED/, /^engine appears to be running/,
+  /^could not read the current values/, /^(idle|limit) must be/, /^mode must be/,
+  /^(fast-learning is not supported|already in fast-learning mode|not connected to the ECU yet|learn is (disabled|not built))/,
+  /^unknown command/, /^needs a value/, /^fuel factor changes are (off|disabled|not built)/, /^fuel factor must be/
+];
+
+function parseLive(line) {
+  const f = line.trim().split(',');
+  if ((f.length !== 13 && f.length !== 16) || !/^\d+$/.test(f[0])) return null;     // sketch v3.6+ sends 3 extra fields
+  const n = f.map(Number);
+  if (n.some(Number.isNaN)) return null;
+  return { ms: n[0], rpm: n[1], throttle: n[2], m2: n[3], m3: n[4], m4: n[5], m5: n[6],
+           o2: n[7], battery: n[8], intake: n[9], head: n[10], mode: n[11], locked: n[12],
+           ecuMode: f.length === 16 ? n[13] : null, learnPt: f.length === 16 ? n[14] : null, learnSt: f.length === 16 ? n[15] : null };
+}
+
+function buildPlan(target, cur) {
+  const steps = [];
+  if (target.idle != null && cur.idle !== target.idle)
+    steps.push({ cmd: 'idle ' + target.idle, label: 'Idle ' + cur.idle + ' → ' + target.idle + ' rpm' });
+  if (target.limit != null && cur.limit !== target.limit)
+    steps.push({ cmd: 'limit ' + target.limit, label: 'Rev limit ' + cur.limit + ' → ' + target.limit + ' rpm' });
+  if (target.fuel != null && cur.fuel != null && Math.round(target.fuel * 1000) !== Math.round(cur.fuel * 1000))
+    steps.push({ cmd: 'fuel ' + target.fuel.toFixed(3), label: 'Fuel factor ' + cur.fuel.toFixed(3) + ' → ' + target.fuel.toFixed(3) });
+  if (target.mode != null && cur.mode !== target.mode)
+    steps.push({ cmd: 'mode ' + target.mode, label: 'Run mode ' + modeName(cur.mode) + ' → ' + modeName(target.mode) });
+  return steps;
+}
+
+function validateTarget(t) {
+  const errs = [];
+  if (t.idle != null && !(Number.isInteger(t.idle) && t.idle >= LIMITS.idle[0] && t.idle <= LIMITS.idle[1]))
+    errs.push('Idle must be a whole number from ' + LIMITS.idle[0] + ' to ' + LIMITS.idle[1] + '.');
+  if (t.limit != null && !(Number.isInteger(t.limit) && t.limit >= LIMITS.limit[0] && t.limit <= LIMITS.limit[1]))
+    errs.push('Rev limit must be a whole number from ' + LIMITS.limit[0] + ' to ' + LIMITS.limit[1] + '.');
+  if (t.mode != null && !(Number.isInteger(t.mode) && t.mode >= LIMITS.mode[0] && t.mode <= LIMITS.mode[1]))
+    errs.push('Mode must be 0, 1 or 2.');
+  if (t.fuel != null && !(typeof t.fuel === 'number' && t.fuel >= LIMITS.fuel[0] && t.fuel <= LIMITS.fuel[1]))
+    errs.push('Fuel factor must be from 1.000 to 3.000.');
+  return errs;
+}
+
+// ---- Fast self-learning: logic copied from the original app's learning screen ----
+const LEARN_MAX_SW = 400000000;      // the original app marks ECU software numbers at or above this as "not implemented"
+const LEARN_TEXT = {
+  off: 'Not in fast-learning mode',
+  done: 'Fast-learning is done, please close the power switch',
+  between: 'Not in learning point',
+  pointDone: 'The learning of this point is done',
+  learning: 'In learning point and doing learn'
+};
+function learnEligibility(s) {
+  if (!s || !s.linked || s.sw == null) return { ok: false, text: 'Connect to find out whether your ECU supports fast-learning.' };
+  if (s.sw >= LEARN_MAX_SW) return { ok: false, unsupported: true, text: 'Not supported on this ECU: its software number (' + s.sw + ') is ' + LEARN_MAX_SW + ' or higher, which the original app also marks as not implemented.' };
+  if (!s.live || s.live.ecuMode == null) return { ok: false, text: 'Upload the latest Arduino sketch (v3.6 or newer) from GitHub to monitor and start fast-learning.' };
+  return { ok: true, text: 'Supported: this ECU software number (' + s.sw + ') is below ' + LEARN_MAX_SW + '. Built from the original app\'s code; the author has not tested it on a supported ECU.' };
+}
+function learnStatus(ecuMode, pt, tot) {
+  if (ecuMode !== 2) return { key: 'off', text: LEARN_TEXT.off };
+  if ((tot & 63) === 63) return { key: 'done', text: LEARN_TEXT.done };
+  if (pt === 0 || pt === 2) return { key: 'between', text: LEARN_TEXT.between };
+  if (((tot >> (pt - 1)) & 1) === 1) return { key: 'pointDone', text: LEARN_TEXT.pointDone };
+  return { key: 'learning', text: LEARN_TEXT.learning };
+}
+// five circles = learning points 1, 3, 4, 5, 6 (state bits 0, 2, 3, 4, 5): green learned, red learning now, grey waiting
+function learnCircles(pt, tot) {
+  return [[1, 0], [3, 2], [4, 3], [5, 4], [6, 5]].map((pb) => (((tot >> pb[1]) & 1) ? 'done' : (pt === pb[0] ? 'current' : 'idle')));
+}
+
+// Only http(s) links are ever shown as donation links.
+function safeLink(u) { return typeof u === 'string' && /^https:\/\/[^\s"'<>]+$/.test(u) ? u : ''; }
+
+class Ecu {
+  constructor(writeFn, cb) {
+    this.write = writeFn;
+    this.cb = cb || {};
+    this.buf = '';
+    this.waiters = [];
+    this.chain = Promise.resolve();
+    this.lastLiveAt = 0;
+    this.state = {
+      sketch: null, linked: false, proto: null, sw: null, model: null,
+      idle: null, limit: null, fuel: null, fuelOn: false, mode: null,
+      ecuMode: null, locked: null, startCount: null, runTime: null, totalTime: null,
+      faultsCur: [], faultsHis: [], faultsRead: false, live: null
+    };
+  }
+
+  feed(chunk) {
+    this.buf += chunk;
+    let i;
+    while ((i = this.buf.indexOf('\n')) >= 0) {
+      const line = this.buf.slice(0, i).replace(/\r/g, '');
+      this.buf = this.buf.slice(i + 1);
+      this.handleLine(line);
+    }
+    if (this.buf.length > 4000) this.buf = '';
+  }
+
+  handleLine(line) {
+    if (this.cb.onLine) this.cb.onLine(line);
+    const live = parseLive(line);
+    if (live) {
+      this.state.live = live;
+      this.lastLiveAt = Date.now();
+      if (this.cb.onLive) this.cb.onLive(live);
+    } else {
+      this.parseInfo(line);
+    }
+    for (const w of this.waiters.slice()) {
+      const r = w.fn(line);
+      if (r !== undefined) w.done(r);
+    }
+  }
+
+  parseInfo(line) {
+    const s = this.state;
+    let m, changed = true;
+    if ((m = line.match(/ROJO tuner v(\d+(?:\.\d+)*)/))) s.sketch = m[1];
+    else if ((m = line.match(/protocol version (\d+), software version 0x([0-9A-Fa-f]+)/))) {
+      s.linked = true; s.proto = +m[1]; s.sw = parseInt(m[2], 16);
+    }
+    else if (/Connect: no reply/.test(line)) s.linked = false;
+    else if ((m = line.match(/Idle\/limit: target idle (\d+) rpm, rev limit (\d+) rpm/))) { s.idle = +m[1]; s.limit = +m[2]; }
+    else if ((m = line.match(/^fuel factor = ([\d.]+)/))) s.fuel = parseFloat(m[1]);
+    else if ((m = line.match(/^fuel factor changes: (ON|off)/))) s.fuelOn = (m[1] === 'ON');
+    else if ((m = line.match(/^run mode \(live data\): (\d+)/))) s.mode = +m[1];
+    else if ((m = line.match(/^(?:after write, )?current: idle (\d+) rpm, limit (\d+) rpm, fuel factor ([\d.]+), mode (\d+|unknown)/))) {
+      s.idle = +m[1]; s.limit = +m[2]; s.fuel = parseFloat(m[3]); s.mode = m[4] === 'unknown' ? null : +m[4];
+    }
+    else if ((m = line.match(/fault codes: current (\d+), history (\d+)/))) { s.faultsCur = []; s.faultsHis = []; s.faultsRead = true; }
+    else if ((m = line.match(/^\s+(current|history) (P[0-9A-F]{4})\s*$/))) {
+      (m[1] === 'current' ? s.faultsCur : s.faultsHis).push(m[2]);
+    }
+    else if ((m = line.match(/locked flag\s+(\S+)/))) s.locked = (m[1] === 'LOCKED');
+    else if ((m = line.match(/^\s*ecu mode\s+(\d+)/))) s.ecuMode = +m[1];
+    else if ((m = line.match(/^\s*start count\s+(\d+)/))) s.startCount = +m[1];
+    else if ((m = line.match(/^\s*this run time\s+(\d+)/))) s.runTime = +m[1];
+    else if ((m = line.match(/^\s*total run time\s+(\d+)/))) s.totalTime = +m[1];
+    else if (/^3E 00 01 00 (?:[0-9A-F]{2} ?){20,}/.test(line)) {          // the tuning block: model name sits at bytes 14-29
+      const bytes = line.trim().split(/\s+/).map((h) => parseInt(h, 16));
+      const model = String.fromCharCode.apply(null, bytes.slice(14, 30)).replace(/\0[\s\S]*$/, '').trim();
+      if (/^[\x20-\x7E]{6,}$/.test(model)) s.model = model; else changed = false;
+    }
+    else if ((m = line.match(/^throttle ([\d.]+) %\s+min ([\d.]+)\s+max ([\d.]+)/))) {
+      changed = false;
+      if (this.cb.onTps) this.cb.onTps({ now: +m[1], min: +m[2], max: +m[3], done: false });
+    }
+    else if ((m = line.match(/^closed read ([\d.]+) %, fully open read ([\d.]+) %/))) {
+      changed = false;
+      if (this.cb.onTps) this.cb.onTps({ now: null, min: +m[1], max: +m[2], done: true });
+    }
+    else changed = false;
+    if (changed && this.cb.onState) this.cb.onState(s);
+  }
+
+  waitFor(fn, timeoutMs) {
+    return new Promise((resolve) => {
+      const w = { fn };
+      w.done = (r) => {
+        clearTimeout(w.t);
+        this.waiters = this.waiters.filter((x) => x !== w);
+        resolve(r);
+      };
+      w.t = setTimeout(() => w.done({ timeout: true }), timeoutMs);
+      this.waiters.push(w);
+    });
+  }
+
+  async _exec(cmd, fn, timeoutMs) {
+    const p = this.waitFor(fn, timeoutMs);   // listen before sending, so nothing is missed
+    await this.write(cmd + '\n');
+    return p;
+  }
+
+  enqueue(task) {
+    const p = this.chain.then(() => task());
+    this.chain = p.catch(() => {});
+    return p;
+  }
+
+  // ----- start-up -----
+  async start() {
+    let r = await this.waitFor((l) => (/^c \| r \| d/.test(l) ? true : undefined), 8000);
+    if (r && r.timeout) {                       // no reset happened: poke the sketch
+      const help = this.waitFor((l) => (/^c \| r \| d/.test(l) ? true : undefined), 3000);   // listen first, then ask
+      await this.write('h\n');
+      r = await help;
+      if (r && r.timeout) return { ok: false, error: 'The Arduino did not answer. Is rojo_tuner.ino loaded, and is the baud rate 115200?' };
+    }
+    // live log: it is off after a reset; only toggle it if no live lines are already arriving
+    const already = await this.waitFor((l) => (parseLive(l) ? true : undefined), 1500);
+    if (already && already.timeout) {
+      const live = this.waitFor((l) => (parseLive(l) ? true : undefined), 4000);
+      await this.write('l\n');
+      const got = await live;
+      if (got && got.timeout) return { ok: false, error: 'No live data came back after turning the live log on.' };
+    }
+    return { ok: true };
+  }
+
+  // ----- commands (all queued, one at a time) -----
+  readSettings() { return this.enqueue(() => this._read()); }
+  async _read() {
+    const r = await this._exec('r', (l) => {
+      if (/^run mode \(live data\):/.test(l)) return { ok: true };
+      if (/^Tuning block: .*no reply/.test(l)) return { ok: false, error: 'Tuning block: no reply' };
+    }, 8000);
+    if (r.timeout) return { ok: false, error: 'Timed out reading the settings.' };
+    return r;
+  }
+
+  readFaults() { return this.enqueue(() => this._faults()); }
+  async _faults() {
+    let want = null, got = 0;
+    const r = await this._exec('d', (l) => {
+      let m;
+      if ((m = l.match(/fault codes: current (\d+), history (\d+)/))) {
+        want = +m[1] + +m[2]; got = 0;
+        if (want === 0) return { ok: true };
+        return undefined;
+      }
+      if (want !== null && /^\s+(current|history) P[0-9A-F]{4}\s*$/.test(l)) {
+        got++;
+        if (got >= want) return { ok: true };
+      }
+      if (/no live-data message received yet/.test(l)) return { ok: false, error: 'No live data yet.' };
+    }, 6000);
+    if (r.timeout) return { ok: false, error: 'Timed out reading faults.' };
+    return r;
+  }
+
+  // Ask the sketch to prepare a write; it answers with the current values and a confirm prompt.
+  async _propose(cmd) {
+    const info = { current: null, write: null };
+    const r = await this._exec(cmd, (l) => {
+      let m;
+      if ((m = l.match(/^current: idle (\d+) rpm, limit (\d+) rpm, fuel factor ([\d.]+), mode (\d+|unknown)/)))
+        info.current = { idle: +m[1], limit: +m[2], fuel: parseFloat(m[3]), mode: m[4] === 'unknown' ? null : +m[4] };
+      if (/^WRITE: /.test(l)) info.write = l.replace(/^WRITE: /, '').trim();
+      if (/Type y \+ ENTER to confirm/.test(l)) return { ok: true };
+      if (REFUSALS.some((re) => re.test(l))) return { ok: false, error: l.trim() };
+    }, 15000);
+    if (r.timeout) return { ok: false, error: 'No response from the sketch (timed out).' };
+    return Object.assign({}, r, info);
+  }
+
+  async _confirm(yes) {
+    const r = await this._exec(yes ? 'y' : 'n', (l) => {
+      if (/^VERIFIED/.test(l)) return { ok: true, verified: true };
+      if (/^MISMATCH/.test(l)) return { ok: false, mismatch: true, error: l.trim() };
+      if (/NO ACK|^write failed|^could not re-read|^no live data|^ECU reports LOCKED|^engine appears|^current mode unknown/.test(l))
+        return { ok: false, error: l.trim() };
+      if (/^cancelled/.test(l)) return { ok: false, cancelled: true };
+    }, 25000);
+    if (r.timeout) return { ok: false, error: 'No confirmation from the sketch (timed out).' };
+    return r;
+  }
+
+  // The user has already confirmed the whole plan in the app, so each step is sent with 'y'.
+  runPlan(steps) { return this.enqueue(() => this._runPlan(steps)); }
+  async _runPlan(steps) {
+    const results = [];
+    for (const step of steps) {
+      const p = await this._propose(step.cmd);
+      if (!p.ok) { results.push({ step, ok: false, error: p.error }); return { ok: false, results }; }
+      const c = await this._confirm(true);
+      results.push(Object.assign({ step }, c));
+      if (!c.ok) {
+        await this.write('\n');                 // make sure nothing is left pending in the sketch
+        return { ok: false, results };
+      }
+    }
+    await this._read();
+    return { ok: true, results };
+  }
+
+  // Write the current values back unchanged (first test).
+  sameTest() { return this.enqueue(() => this._same()); }
+  async _same() {
+    const p = await this._propose('same');
+    if (!p.ok) return { ok: false, error: p.error };
+    return { ok: true, prompt: p, confirm: async () => this._confirm(true), cancel: async () => this._confirm(false) };
+  }
+
+  // Fuel factor changes are switched on per session; the sketch forgets this when it restarts.
+  setFuelEnabled(on) {
+    return this.enqueue(async () => {
+      const r = await this._exec(on ? 'fuelon' : 'fueloff', (l) => {
+        if (/^fuel factor changes: (ON|off)/.test(l)) return { ok: true, on: /ON/.test(l) };
+        if (/^(unknown command|fuel factor changes are)/.test(l)) return { ok: false, error: l.trim() };
+      }, 4000);
+      if (r.timeout) return { ok: false, error: 'The sketch did not answer - it may be an older version without fuel support. Upload the latest sketch.' };
+      return r;
+    });
+  }
+
+  // Erase stored fault codes/history (the original app's "clear historical fault code").
+  clearCodes() { return this.enqueue(() => this._clear()); }
+  async _clear() {
+    const p = await this._propose('clear');
+    if (!p.ok) return { ok: false, error: p.error };
+    const r = await this._exec('y', (l) => {
+      if (/^CLEARED/.test(l)) return { ok: true, cleared: true };
+      if (/^DONE - /.test(l)) return { ok: true, cleared: false };
+      if (/NO ACK|^clear failed/.test(l)) return { ok: false, error: l.trim() };
+    }, 20000);
+    if (r.timeout) return { ok: false, error: 'No answer from the sketch (timed out) - it may be an older version without clear support.' };
+    return r;
+  }
+
+  // Ask the sketch for its raw live-data message (for the diagnostic log).
+  rawDump() { return this.enqueue(() => this._raw()); }
+  async _raw() {
+    const r = await this._exec('x', (l) => (/^(raw live-data message|no live-data message)/.test(l) ? true : undefined), 4000);
+    await new Promise((res) => setTimeout(res, 700));      // let the hex lines arrive
+    return { ok: !(r && r.timeout) };
+  }
+
+  // Start the ECU's fast self-learning (only on software numbers below 400000000).
+  startLearning() { return this.enqueue(() => this._learn()); }
+  async _learn() {
+    const p = await this._propose('learn');
+    if (!p.ok) return { ok: false, error: p.error };
+    const r = await this._exec('y', (l) => {
+      if (/^ENTERED/.test(l)) return { ok: true };
+      if (/NO ACK|^fast-learning start failed|^no live data yet/.test(l)) return { ok: false, error: l.trim() };
+    }, 15000);
+    if (r.timeout) return { ok: false, error: 'No answer from the sketch (timed out) - upload the latest sketch from GitHub.' };
+    return r;
+  }
+
+  // Throttle check runs inside the sketch at full speed; stop() sends the key press it waits for.
+  tpsStart() {
+    return this.enqueue(async () => {
+      const r = await this._exec('tps', (l) => {
+        if (/^(Looks calibrated|Not 0 \/ 100)/.test(l)) return { ok: true, verdict: l.trim() };
+        if (/^no live data/.test(l)) return { ok: false, error: l.trim() };
+      }, 120000);
+      if (r.timeout) return { ok: false, error: 'Throttle check timed out.' };
+      return r;
+    });
+  }
+  tpsStop() { return this.write('\n'); }
+}
+
+// One text file with everything needed to diagnose a problem.
+function buildDiagnosticsText(info) {
+  const s = info.state || {};
+  const v = (x) => (x === null || x === undefined ? '-' : x);
+  const L = [];
+  L.push('ROJO Tuner diagnostic log');
+  L.push('Generated: ' + info.now);
+  L.push('Terms version: ' + v(info.terms) + ' | Baud: ' + v(info.baud));
+  L.push('Browser: ' + v(info.userAgent));
+  L.push('');
+  L.push('== ECU ==');
+  L.push('Model: ' + v(s.model));
+  L.push('Sketch: ' + (s.sketch ? 'v' + s.sketch : '-'));
+  L.push('Protocol: ' + v(s.proto));
+  L.push('Software: ' + (s.sw != null ? '0x' + s.sw.toString(16).toUpperCase() + ' (' + s.sw + ')' : '-'));
+  L.push('ECU answering: ' + (s.linked ? 'yes' : 'no'));
+  L.push('Ignition-on count: ' + v(s.startCount) + ' | Total run time (s): ' + v(s.totalTime) + ' | This run (s): ' + v(s.runTime));
+  L.push('Lock: ' + (s.locked === true ? 'locked' : s.locked === false ? 'unlocked' : '-'));
+  L.push('Fast-learning: ' + learnEligibility(s).text);
+  L.push('');
+  L.push('== Settings (as last read) ==');
+  L.push('Idle: ' + v(s.idle) + ' rpm | Rev limit: ' + v(s.limit) + ' rpm | Run mode: ' + (s.mode == null ? '-' : modeName(s.mode)));
+  L.push('Fuel factor: ' + (s.fuel != null ? s.fuel.toFixed(3) : '-') + ' | Fuel changes switched on: ' + (s.fuelOn ? 'yes' : 'no'));
+  const b = info.baseline;
+  L.push('Saved baseline: ' + (b ? 'idle ' + b.idle + ', limit ' + b.limit + ', mode ' + modeName(b.mode) + (b.fuel != null ? ', fuel ' + Number(b.fuel).toFixed(3) : '') : '-'));
+  L.push('');
+  L.push('== Fault codes ==');
+  L.push('Current: ' + ((s.faultsCur || []).join(', ') || 'none') + ' | History: ' + ((s.faultsHis || []).join(', ') || 'none'));
+  L.push('');
+  L.push('== Last live values ==');
+  const lv = s.live;
+  L.push(lv ? 'rpm ' + lv.rpm + ', throttle ' + lv.throttle + ' %, battery ' + lv.battery + ' V, head ' + lv.head + ' C, intake ' + lv.intake + ' C, O2 ' + lv.o2 + ' mV, ign ' + lv.m3 + ', m2 ' + lv.m2 + ', m4 ' + lv.m4 + ', m5 ' + lv.m5 + ', mode ' + lv.mode + ', locked ' + lv.locked + (lv.ecuMode != null ? ', ecu mode ' + lv.ecuMode + ', learn point ' + lv.learnPt + ', learn state ' + lv.learnSt : '') : '-');
+  L.push('');
+  L.push('== Everything exchanged with the Arduino (">>" = sent by the app, other lines = received) ==');
+  (info.logLines || []).forEach((x) => L.push(x));
+  return L.join('\n') + '\n';
+}
+
+if (typeof module !== 'undefined') module.exports = { learnEligibility, learnStatus, learnCircles, LEARN_MAX_SW, buildDiagnosticsText, Ecu, parseLive, buildPlan, validateTarget, safeLink, LIMITS, MODE_NAMES, FAULT_TEXT };
+// ==== LOGIC END ==========================================================================================
+</script>
+
+<script>
+// ==== USER INTERFACE ====================================================================================
+const $ = (id) => document.getElementById(id);
+const TERMS_VERSION = '2026-10-18';
+let port = null, reader = null, writer = null, readClosed = null;
+let ecu = null;
+let busy = false;
+const logAll = [];      // every line exchanged with the Arduino (kept in memory for the diagnostic log)
+let rec = null;         // live-data recording in progress: { rows: [] }
+const dirty = { idle: false, limit: false, mode: false, fuel: false };
+
+if (!('serial' in navigator)) $('unsupported').hidden = false;
+
+// ---------- small helpers ----------
+function toast(msg, ms) {
+  const t = $('toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), ms || 3500);
+}
+function fmt(v, d) { return (v === null || v === undefined || Number.isNaN(v)) ? '–' : Number(v).toFixed(d == null ? 0 : d); }
+function hms(sec) {
+  if (sec == null) return '–';
+  const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60);
+  return h + ' h ' + String(m).padStart(2, '0') + ' min';
+}
+function logLine(line) {
+  logAll.push(new Date().toLocaleTimeString() + '  ' + line);
+  if (logAll.length > 20000) logAll.shift();
+}
+function download(name, text) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], { type: 'text/plain' }));
+  a.download = name; document.body.appendChild(a); a.click(); a.remove();
+}
+function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+
+function confirmDialog(title, html, okText) {
+  return new Promise((resolve) => {
+    const d = $('dlg');
+    $('dlgTitle').textContent = title; $('dlgBody').innerHTML = html; $('dlgOk').textContent = okText || 'Write';
+    const finish = (v) => { d.onclose = null; if (d.open) d.close(); resolve(v); };
+    $('dlgOk').onclick = () => finish(true);
+    $('dlgCancel').onclick = () => finish(false);
+    d.onclose = () => resolve(false);
+    d.showModal();
+  });
+}
+
+// ---------- terms ----------
+function termsAccepted() {
+  try { const t = JSON.parse(lsGet('rojo_terms')); return !!(t && t.v === TERMS_VERSION); } catch (e) { return false; }
+}
+function showTerms() {
+  $('termsBody').innerHTML = $('termsTpl').innerHTML;
+  const acc = termsAccepted();
+  let when = '';
+  try { when = new Date(JSON.parse(lsGet('rojo_terms')).at).toLocaleString(); } catch (e) {}
+  $('chkTerms').checked = acc; $('termsOk').disabled = !acc;
+  $('termsCheckRow').hidden = acc; $('termsOk').hidden = acc;
+  $('termsDone').hidden = !acc; $('termsDone').textContent = acc ? 'You accepted these terms on ' + when + '.' : '';
+  $('dlgTerms').showModal();
+}
+$('chkTerms').onchange = () => { $('termsOk').disabled = !$('chkTerms').checked; };
+$('termsOk').onclick = () => {
+  if (!$('chkTerms').checked) return;
+  lsSet('rojo_terms', JSON.stringify({ v: TERMS_VERSION, at: new Date().toISOString() }));
+  $('dlgTerms').close(); render(); toast('Terms accepted. You can now connect.');
+};
+$('termsNo').onclick = () => { $('dlgTerms').close(); render(); };
+$('btnTerms').onclick = showTerms; $('btnTerms2').onclick = showTerms;
+
+// ---------- manual and downloads ----------
+function setRepoLinks(root) {
+  const url = safeLink(REPO_URL);
+  root.querySelectorAll('a[data-repo]').forEach((a) => { if (url) a.href = url; });
+}
+function showManual() { $('manualBody').innerHTML = $('manualTpl').innerHTML; setRepoLinks($('manualBody')); $('dlgManual').showModal(); }
+$('btnManual').onclick = showManual; $('btnManual2').onclick = showManual;
+$('manualClose').onclick = () => $('dlgManual').close();
+{ const url = safeLink(REPO_URL); if (url) $('lnkRepo').href = url; else $('lnkRepo').hidden = true; }
+
+// ---------- donation ----------
+function renderDonate() {
+  const body = $('donateBody'); body.innerHTML = '';
+  const link = safeLink(DONATE.paypal);
+  const coins = (DONATE.crypto || []).filter((c) => c && c.address);
+  if (!link && !coins.length) { $('donateCard').hidden = true; return; }
+  $('donateCard').hidden = false;
+  $('donateMsg').textContent = DONATE.message || '';
+  if (link) {
+    const a = document.createElement('a'); a.className = 'btn'; a.href = link; a.target = '_blank'; a.rel = 'noopener noreferrer';
+    a.textContent = 'Donate with PayPal'; body.appendChild(a);
+  }
+  coins.forEach((c) => {
+    const box = document.createElement('div'); box.className = 'coin';
+    const name = document.createElement('div'); name.textContent = c.coin || 'Crypto'; name.style.fontWeight = '700';
+    const addr = document.createElement('div'); addr.className = 'addr'; addr.textContent = c.address;
+    const copy = document.createElement('button'); copy.className = 'small'; copy.textContent = 'Copy address';
+    copy.onclick = () => { try { navigator.clipboard.writeText(c.address); toast('Address copied. Double-check it before sending.'); } catch (e) { toast('Select and copy the address by hand.'); } };
+    box.appendChild(name); box.appendChild(addr); box.appendChild(copy); body.appendChild(box);
+  });
+}
+
+// ---------- baseline (kept per ECU model + software) ----------
+function baseKey() { const s = ecu && ecu.state; return 'rojo_base:' + ((s && s.model) || 'unknown') + ':' + ((s && s.sw) || 0); }
+function loadBase() { try { const b = JSON.parse(lsGet(baseKey())); if (b && b.idle != null && b.limit != null && b.mode != null) return b; } catch (e) {} return null; }
+function saveBase(b) { lsSet(baseKey(), JSON.stringify(Object.assign({ saved: new Date().toISOString() }, b))); }
+function autoBaseline() {
+  const s = ecu.state;
+  if (s.idle != null && s.limit != null && s.mode != null && !loadBase()) {
+    saveBase({ idle: s.idle, limit: s.limit, mode: s.mode, fuel: s.fuel });
+    toast('First time seeing this ECU - its current values were saved as your baseline.', 6000);
+  }
+}
+
+// ---------- rendering ----------
+function writeBlockReason() {
+  if (!ecu || !port) return 'Connect first.';
+  const s = ecu.state;
+  if (!s.linked) return 'The ECU is not answering.';
+  if (busy) return 'Busy…';
+  if (!s.live) return 'No live data yet.';
+  if (s.live.rpm >= 50) return 'Engine is running – switch it off to write (the sketch also blocks this).';
+  if (s.live.locked === 1) return 'The ECU reports itself locked.';
+  return '';
+}
+function render() {
+  const s = ecu ? ecu.state : null;
+  const live = s && s.live;
+  $('vRpm').textContent = live ? live.rpm : '–';
+  $('vThr').textContent = live ? fmt(live.throttle, 1) : '–';
+  $('barThr').style.width = live ? Math.max(0, Math.min(100, live.throttle)) + '%' : '0';
+  $('vFuel').textContent = s && s.fuel != null ? s.fuel.toFixed(3) : '–';
+  $('vCorr').textContent = live ? fmt(live.m4, 4) : '–';
+  $('vBat').textContent = live ? fmt(live.battery, 2) : '–';
+  $('vHead').textContent = live ? fmt(live.head, 1) : '–';
+  $('vAir').textContent = live ? fmt(live.intake, 1) : '–';
+  $('vO2').textContent = live ? fmt(live.o2, 0) : '–';
+  $('vIgn').textContent = live ? fmt(live.m3, 1) : '–';
+  $('vMode').textContent = live ? modeName(live.mode) : '–';
+  $('vLock').textContent = live ? (live.locked === 1 ? 'locked' : 'unlocked') : '–';
+  $('vOther').textContent = live ? ('m2 ' + fmt(live.m2, 3) + ' · m5 ' + fmt(live.m5, 3)) : '–';
+
+  $('kModel').textContent = s && s.model ? s.model : '–';
+  $('ecuInfo').textContent = s && s.model ? s.model : '';
+  $('kSketch').textContent = s && s.sketch ? 'v' + s.sketch : '–';
+  $('kProto').textContent = s && s.proto != null ? s.proto : '–';
+  $('kSw').textContent = s && s.sw != null ? ('0x' + s.sw.toString(16).toUpperCase() + ' (' + s.sw + ')') : '–';
+  $('kStarts').textContent = s && s.startCount != null ? s.startCount : '–';
+  $('kRun').textContent = s ? hms(s.totalTime) : '–';
+  const age = ecu && ecu.lastLiveAt ? (Date.now() - ecu.lastLiveAt) / 1000 : null;
+  $('kLive').textContent = age == null ? '–' : (age < 4 ? 'streaming' : 'stalled ' + Math.round(age) + ' s');
+
+  $('curIdle').textContent = s && s.idle != null ? s.idle : '–';
+  $('curLimit').textContent = s && s.limit != null ? s.limit : '–';
+  $('curMode').textContent = s && s.mode != null ? modeName(s.mode) : '–';
+  $('curFuel').textContent = s && s.fuel != null ? s.fuel.toFixed(3) : '–';
+  $('curFuel2').textContent = s && s.fuel != null ? s.fuel.toFixed(3) : '–';
+  $('chkFuel').disabled = !ecu || !port || busy || !s || !s.linked;
+  $('fuelBox').hidden = !(s && s.fuelOn);
+  if (s) {
+    if (!dirty.fuel && s.fuel != null) $('inFuel').value = s.fuel.toFixed(3);
+    if (!dirty.idle && s.idle != null) $('inIdle').value = s.idle;
+    if (!dirty.limit && s.limit != null) $('inLimit').value = s.limit;
+    if (!dirty.mode && s.mode != null) { const r = document.querySelector('input[name=mode][value="' + s.mode + '"]'); if (r) r.checked = true; }
+  }
+  const b = ecu ? loadBase() : null;
+  let when = ''; try { when = b && b.saved ? ' (saved ' + new Date(b.saved).toLocaleDateString() + ')' : ''; } catch (e) {}
+  $('baseText').textContent = b ? ('idle ' + b.idle + ', rev limit ' + b.limit + ', mode ' + modeName(b.mode) + (b.fuel != null ? ', fuel ' + Number(b.fuel).toFixed(3) : '') + when) : 'none yet – connect and read the ECU first';
+
+  const reason = writeBlockReason();
+  const canWrite = !reason;
+  $('btnApply').disabled = !canWrite; $('btnTest').disabled = !canWrite; $('btnRestore').disabled = !canWrite || !b;
+  $('btnRead').disabled = !ecu || !port || busy; $('btnFaults').disabled = !ecu || !port || busy;
+  $('btnClearCodes').disabled = !ecu || !port || busy || !s || !s.linked;
+  $('btnTpsStart').disabled = !ecu || !port || busy;
+  $('btnSaveBase').disabled = !(s && s.idle != null && s.limit != null && s.mode != null);
+  renderLearn();
+  $('btnConnect').disabled = !termsAccepted();
+  $('btnLog').textContent = rec ? 'Stop & save live data log (' + rec.rows.length + ' rows)' : 'Log live data';
+  $('btnLog').disabled = !rec && !(ecu && port && s && s.live);
+  $('btnDiag').disabled = busy || (!ecu && !logAll.length);
+  $('writeNote').textContent = reason ? ('Writing is off: ' + reason) : 'Writing is allowed (engine off, ECU unlocked).';
+
+  const faults = $('faultBody');
+  if (s && s.faultsRead) {
+    faults.innerHTML = '';
+    const add = (type, code, text) => {
+      const tr = document.createElement('tr');
+      [type, code, text].forEach((t) => { const td = document.createElement('td'); td.textContent = t; tr.appendChild(td); });
+      faults.appendChild(tr);
+    };
+    if (!s.faultsCur.length && !s.faultsHis.length) add('', '', 'No fault codes stored');
+    s.faultsCur.forEach((c) => add('current', c, FAULT_TEXT[c] || 'Not in the manual list'));
+    s.faultsHis.forEach((c) => add('history', c, FAULT_TEXT[c] || 'Not in the manual list'));
+  }
+  const nl = $('noLink');
+  if (ecu && port && s && !s.linked) { nl.hidden = false; nl.textContent = 'The Arduino is connected but the ECU did not answer. Check ignition on, CAN-H/CAN-L wiring, then press Connect again.'; }
+  else nl.hidden = true;
+}
+
+function renderLearn() {
+  const s = ecu ? ecu.state : null, live = s && s.live;
+  const el = learnEligibility(s);
+  $('learnElig').textContent = el.text;
+  const showing = el.ok && live && live.ecuMode != null;
+  const st = showing ? learnStatus(live.ecuMode, live.learnPt, live.learnSt) : null;
+  const circles = showing ? learnCircles(live.learnPt, live.learnSt) : ['idle', 'idle', 'idle', 'idle', 'idle'];
+  circles.forEach((c, i) => { $('lrnC' + (i + 1)).className = 'dot ' + c; });
+  $('learnStatus').textContent = st ? st.text : '–';
+  $('learnVals').textContent = live ? ('Engine speed ' + live.rpm + ' rpm · Throttle ' + fmt(live.throttle, 1) + ' % · O2 sensor ' + fmt(live.o2, 0) + ' mV · Cylinder head ' + fmt(live.head, 1) + ' °C' + (showing ? ' · ecu mode ' + live.ecuMode + ', point ' + live.learnPt + ', state ' + live.learnSt : '')) : '–';
+  $('btnLearn').disabled = !el.ok || busy || !!(live && live.ecuMode === 2);
+}
+
+function setPill(text, cls) { const p = $('pill'); p.textContent = text; p.className = 'pill ' + (cls || ''); }
+
+// ---------- serial ----------
+async function connect() {
+  if (!termsAccepted()) { showTerms(); return; }
+  try {
+    port = await navigator.serial.requestPort();
+    await port.open({ baudRate: parseInt($('selBaud').value, 10) || 115200 });
+  } catch (e) { port = null; if (e.name !== 'NotFoundError') toast('Could not open the port: ' + e.message + ' (is another program using it?)', 7000); return; }
+  lsSet('rojo_baud', $('selBaud').value);
+  writer = port.writable.getWriter();
+  const enc = new TextEncoder();
+  ecu = new Ecu((text) => { logLine('>> ' + text.replace(/\n/g, '\\n')); return writer.write(enc.encode(text)); }, {
+    onLine: logLine,
+    onLive: (r) => { if (rec) rec.rows.push(liveRow(r)); render(); },
+    onState: render,
+    onTps: (t) => { if (t.now != null) $('tNow').textContent = t.now.toFixed(1) + ' %'; $('tMin').textContent = t.min.toFixed(1) + ' %'; $('tMax').textContent = t.max.toFixed(1) + ' %'; }
+  });
+  const dec = new TextDecoderStream();
+  readClosed = port.readable.pipeTo(dec.writable).catch(() => {});
+  reader = dec.readable.getReader();
+  pump();
+  $('chkFuel').checked = false;
+  $('btnConnect').hidden = true; $('btnDisconnect').hidden = false;
+  setPill('Connecting…', 'warn'); render();
+  const r = await ecu.start();
+  if (!r.ok) { setPill('No sketch answer', 'bad'); toast(r.error, 8000); return; }
+  setPill('Connected', 'on');
+  await ecu.readSettings(); await ecu.readFaults();
+  autoBaseline(); render();
+  if (!ecu.state.linked) setPill('ECU not answering', 'warn');
+}
+async function pump() {
+  try { for (;;) { const { value, done } = await reader.read(); if (done) break; if (value) ecu.feed(value); } } catch (e) { /* port closed */ }
+}
+async function disconnect() {
+  try { if (reader) await reader.cancel(); } catch (e) {}
+  try { await readClosed; } catch (e) {}
+  try { if (writer) writer.releaseLock(); } catch (e) {}
+  try { if (port) await port.close(); } catch (e) {}
+  port = reader = writer = null; busy = false; $('chkFuel').checked = false;
+  $('btnConnect').hidden = false; $('btnDisconnect').hidden = true;
+  setPill('Disconnected', ''); render();
+}
+if ('serial' in navigator) navigator.serial.addEventListener('disconnect', () => { if (port) { toast('The Arduino was unplugged.', 5000); disconnect(); } });
+
+// ---------- actions ----------
+async function withBusy(fn) {
+  busy = true; render();
+  try { return await fn(); } finally { busy = false; render(); }
+}
+function readTarget() {
+  const m = document.querySelector('input[name=mode]:checked');
+  const t = { idle: parseInt($('inIdle').value, 10), limit: parseInt($('inLimit').value, 10), mode: m ? parseInt(m.value, 10) : null };
+  if (ecu && ecu.state.fuelOn) t.fuel = parseFloat($('inFuel').value);     // only when the fuel option is switched on
+  return t;
+}
+async function applyTarget(target, title) {
+  const bad = validateTarget(target); if (bad.length) { toast(bad.join(' '), 6000); return; }
+  const reason = writeBlockReason(); if (reason) { toast(reason); return; }
+  await withBusy(async () => {
+    await ecu.readSettings();
+    const s = ecu.state;
+    const cur = { idle: s.idle, limit: s.limit, mode: s.mode, fuel: s.fuel };
+    if (cur.idle == null || cur.limit == null || cur.mode == null) { toast('Could not read the current values. Try Read from ECU.', 6000); return; }
+    const steps = buildPlan(target, cur);
+    if (!steps.length) { toast('Nothing to change – the ECU already has these values.'); return; }
+    const ok = await confirmDialog(title,
+      '<div class="ul">' + steps.map((x) => x.label).join('<br>') + '</div>' +
+      '<div class="warn">Engine off, battery on a charger. Note the old values first (see Baseline).' +
+      (steps.some((x) => /^fuel/.test(x.cmd))
+        ? ' <b>Fuel factor adds fuel</b> (1.000 = unchanged): too much can foul plugs, dilute the oil and harm the catalyst and O2 sensor. Change it in small steps.'
+        : ' Fuel factor is not touched.') + '</div>', 'Write to ECU');
+    if (!ok) return;
+    toast('Writing…', 20000);
+    const res = await ecu.runPlan(steps);
+    dirty.idle = dirty.limit = dirty.mode = dirty.fuel = false;
+    if (res.ok) { toast('Done – the ECU reports the new values (verified).', 5000); }
+    else {
+      const last = res.results[res.results.length - 1];
+      toast('Stopped: ' + (last && last.error ? last.error : 'unknown problem') + ' – press Read from ECU to see what the ECU has.', 9000);
+    }
+    await ecu.readSettings(); render();
+  });
+}
+
+$('btnConnect').onclick = connect;
+$('btnDisconnect').onclick = disconnect;
+$('btnRead').onclick = () => withBusy(async () => { dirty.idle = dirty.limit = dirty.mode = dirty.fuel = false; const r = await ecu.readSettings(); if (!r.ok) toast(r.error || 'No answer', 5000); autoBaseline(); render(); });
+$('btnFaults').onclick = () => withBusy(async () => { const r = await ecu.readFaults(); if (!r.ok) toast(r.error || 'No answer', 5000); render(); });
+$('btnApply').onclick = () => applyTarget(readTarget(), 'Write these changes?');
+$('btnLearn').onclick = () => withBusy(async () => {
+  const ok = await confirmDialog('Start fast-learning?',
+    '<div>Fast-learning lets the engine reach its best state in the shortest time (the original app\'s description).</div>' +
+    '<div class="warn"><b>Only with the bike stationary and unloaded - never on the road.</b> Engine fully warm. It may stop the engine. When it says done, switch the ignition off.</div>', 'Start');
+  if (!ok) return;
+  toast('Starting…', 15000);
+  const r = await ecu.startLearning();
+  toast(r.ok ? 'Fast-learning requested. Watch the status in this card.' : 'Could not start: ' + r.error, r.ok ? 6000 : 9000);
+});
+$('btnClearCodes').onclick = () => withBusy(async () => {
+  const s = ecu.state;
+  const list = s.faultsCur.map((c) => c + ' (current)').concat(s.faultsHis.map((c) => c + ' (history)'));
+  const ok = await confirmDialog('Clear the fault codes?',
+    '<div class="ul">' + (list.length ? list.join('<br>') : 'No codes are listed (press Read faults first to be sure).') + '</div>' +
+    '<div>This erases the stored fault codes and history in the ECU. A fault that is still present <b>comes back</b>, so it does not fix anything by itself, and the history may help a mechanic: use Log everything (diagnostics) first if you want a record.</div>', 'Clear codes');
+  if (!ok) return;
+  toast('Clearing…', 15000);
+  const r = await ecu.clearCodes();
+  if (!r.ok) toast('Could not clear: ' + r.error, 8000);
+  else if (r.cleared) toast('Cleared – the ECU reports no fault codes.', 6000);
+  else toast('Done, but the ECU still reports codes: a fault that is still present comes back until its cause is fixed.', 9000);
+  await ecu.readFaults(); render();
+});
+$('btnRestore').onclick = () => { const b = loadBase(); if (!b) { toast('No baseline saved yet.'); return; } applyTarget({ idle: b.idle, limit: b.limit, mode: b.mode, fuel: (ecu.state.fuelOn && b.fuel != null) ? b.fuel : null }, 'Restore the baseline?'); };
+$('btnSaveBase').onclick = () => { const s = ecu.state; if (s.idle == null || s.limit == null || s.mode == null) return; saveBase({ idle: s.idle, limit: s.limit, mode: s.mode, fuel: s.fuel }); render(); toast('Baseline saved.'); };
+$('btnTest').onclick = () => withBusy(async () => {
+  const r = await ecu.sameTest();
+  if (!r.ok) { toast(r.error, 7000); return; }
+  const ok = await confirmDialog('Write-back test',
+    '<div class="ul">' + (r.prompt.current ? 'idle ' + r.prompt.current.idle + ', limit ' + r.prompt.current.limit + ', mode ' + modeName(r.prompt.current.mode) : 'current values') + '</div>' +
+    '<div>This writes the <b>same values back</b>. Nothing should change; it only proves the write path works.</div>', 'Run test');
+  const c = ok ? await r.confirm() : await r.cancel();
+  if (ok) toast(c.ok ? 'Verified – the ECU accepted the writes and still reports the same values.' : ('Problem: ' + (c.error || 'failed')), 8000);
+  render();
+});
+$('inIdle').oninput = () => { dirty.idle = true; };
+$('inLimit').oninput = () => { dirty.limit = true; };
+$('inFuel').oninput = () => { dirty.fuel = true; };
+document.querySelectorAll('input[name=mode]').forEach((r) => { r.onchange = () => { dirty.mode = true; }; });
+
+$('chkFuel').onchange = async () => {
+  const want = $('chkFuel').checked;
+  if (!ecu) { $('chkFuel').checked = false; return; }
+  if (want) {
+    const ok = await confirmDialog('Enable fuel factor changes?',
+      '<div>The fuel factor scales how much fuel the injector delivers: <b>1.000 = unchanged, up to 3.000 = much richer</b>. It is meant for things like a replaced or modified injector.</div>' +
+      '<div class="warn">Too much fuel can foul spark plugs, wash oil from the cylinder wall, dilute the engine oil, overheat the catalyst and damage the O2 sensor. Change it in small steps, engine off, and write the original value down (the Baseline keeps it too). You are responsible for what you set.</div>', 'Enable');
+    if (!ok) { $('chkFuel').checked = false; return; }
+  }
+  const r = await ecu.setFuelEnabled(want);
+  if (!r.ok) { $('chkFuel').checked = false; toast(r.error, 8000); }
+  else toast(want ? 'Fuel factor changes enabled for this session.' : 'Fuel factor changes switched off.');
+  render();
+};
+
+$('btnTpsStart').onclick = async () => {
+  if (!ecu) return;
+  $('btnTpsStart').disabled = true; $('btnTpsStop').disabled = false; busy = true;
+  $('tVerdict').textContent = 'Open and close the throttle fully a few times, then press Stop.';
+  const r = await ecu.tpsStart();
+  busy = false; $('btnTpsStop').disabled = true;
+  $('tVerdict').textContent = r.ok ? r.verdict : ('Problem: ' + r.error);
+  render();
+};
+$('btnTpsStop').onclick = () => { if (ecu) ecu.tpsStop(); };
+
+// ---------- logs ----------
+function stamp() { return new Date().toISOString().replace(/[:.]/g, '-'); }
+function liveRow(r) {
+  const f = ecu && ecu.state.fuel != null ? ecu.state.fuel.toFixed(3) : '';
+  const e = (x) => (x == null ? '' : x);
+  return [new Date().toISOString(), r.ms, r.rpm, r.throttle, r.m2, r.m3, r.m4, r.m5, r.o2, r.battery, r.intake, r.head, r.mode, r.locked, f, e(r.ecuMode), e(r.learnPt), e(r.learnSt)].join(',');
+}
+$('btnLog').onclick = () => {
+  if (!rec) { rec = { rows: [] }; toast('Recording live data. Press the button again to stop and save.', 5000); render(); return; }
+  const done = rec; rec = null;
+  download('rojo_live_' + stamp() + '.csv', LIVE_HEADER + '\n' + done.rows.join('\n') + (done.rows.length ? '\n' : ''));
+  toast('Saved ' + done.rows.length + ' rows.'); render();
+};
+$('btnDiag').onclick = () => withBusy(async () => {
+  if (ecu && port) {
+    toast('Taking a fresh snapshot for the log…', 15000);
+    await ecu.readSettings(); await ecu.readFaults(); await ecu.rawDump();
+  }
+  const text = buildDiagnosticsText({ now: new Date().toISOString(), terms: TERMS_VERSION, baud: $('selBaud').value,
+    userAgent: navigator.userAgent, state: ecu ? ecu.state : null, baseline: ecu ? loadBase() : null, logLines: logAll });
+  download('rojo_diagnostics_' + stamp() + '.txt', text);
+  toast('Diagnostic log saved.');
+});
+{ const b = lsGet('rojo_baud'); if (b && [...$('selBaud').options].some((o) => o.value === b)) $('selBaud').value = b; }
+setInterval(() => { if (ecu) render(); }, 1000);
+renderDonate(); render();
+if (!termsAccepted()) showTerms();
+</script>
+</body>
+</html>
