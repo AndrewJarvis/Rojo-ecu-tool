@@ -26,6 +26,8 @@
 //   fuelon       allow fuel factor changes for this session (off after every restart); fueloff turns it off
 //   fuel F       fuel factor 1.000-3.000 (1.000 = unchanged, higher = more fuel); needs fuelon first
 //   clear        erase stored fault codes/history (asks y + ENTER; a fault still present comes back)
+//   learn        start the ECU's fast self-learning (only ECU software numbers below 400000000; asks y + ENTER)
+//   lw           watch the learning state (read-only, ENTER stops)
 //   h            help
 // Every write shows the current values, asks you to type y + ENTER, re-reads
 // afterwards and says VERIFIED or MISMATCH. Writes are refused while the engine
@@ -62,6 +64,7 @@ bool daqValid = false, rplReady = false;
 uint32_t daqStamp = 0;
 uint16_t daqCount = 0, badLen = 0, badCrc = 0;
 uint8_t protVer = 0;
+uint32_t swVer = 0;         // ECU software number from the Connect reply (0 = not connected yet)
 bool liveOn = false;
 
 struct Ctx {
@@ -231,6 +234,7 @@ void doConnect() {
                   ((uint32_t)rplMsg[5] << 16) | ((uint32_t)rplMsg[6] << 24);
     Serial.print(F("protocol version "));
     Serial.print(protVer);
+    swVer = sw;
     Serial.print(F(", software version 0x"));
     Serial.print(sw, HEX);
     Serial.print(F(" ("));
@@ -341,7 +345,10 @@ void liveLine() {
   Serial.print(rdi16(m + 18) / 10.0, 1);  Serial.print(',');   // meas8
   Serial.print(rdi16(m + 16) / 10.0, 1);  Serial.print(',');   // meas9
   Serial.print(m[130]);                Serial.print(',');   // run mode
-  Serial.println(m[147] == 1 ? 1 : 0);                      // locked
+  Serial.print(m[147] == 1 ? 1 : 0);   Serial.print(',');   // locked
+  Serial.print(m[124]);                Serial.print(',');   // ecu mode (2 = fast-learning)
+  Serial.print(m[126]);                Serial.print(',');   // learning point
+  Serial.println(m[127]);                                   // learning state bits (63 = all done)
 }
 
 void dumpDaq() {
@@ -364,7 +371,7 @@ void dumpDaq() {
 #define REQUIRE_ENGINE_OFF 1
 #define ENABLE_FUEL        1   // 1 = the fuel factor feature is built in; it stays OFF until you type fuelon
 bool fuelEnabled = false;          // back to OFF every time the Arduino restarts
-#define ENABLE_LEARN       0   // 1 = allow "learn" (sends Enter fast-learning mode). Off: the app calls it Unsupported for this ECU software
+#define ENABLE_LEARN       1   // 1 = "learn" is built in; it only runs on ECU software numbers below 400000000 (the original app's own limit)
 
 Action pending = A_NONE;
 uint16_t newIdle = 0, newLimit = 0, newFuel = 0;
@@ -582,26 +589,30 @@ void learnMonitor() {
 
 void proposeLearn() {
 #if ENABLE_LEARN
-  Serial.println(F("FAST-LEARNING (self-learning). The app's notes:"));
-  Serial.println(F(" - only with the bike stationary (the Chinese text says: no-load only, never on the road)"));
+  if (swVer == 0) { Serial.println(F("not connected to the ECU yet - press c to connect first")); return; }
+  if (swVer >= 400000000UL) {
+    Serial.println(F("fast-learning is not supported for this ECU software (the original app treats software numbers of 400000000 and above as not implemented)"));
+    return;
+  }
+  if (!daqValid || daqLen < 150) { Serial.println(F("no live data yet - wait a second and try again")); return; }
+  if (daqMsg[124] == 2) { Serial.println(F("already in fast-learning mode")); return; }
+  Serial.println(F("FAST-LEARNING (self-learning). The original app's notes:"));
+  Serial.println(F(" - only with the bike stationary and unloaded (never on the road)"));
   Serial.println(F(" - engine fully warm (cylinder head temp in the green zone)"));
   Serial.println(F(" - this operation may stop the engine"));
   Serial.println(F(" - when it says done, switch the ignition off"));
   pending = A_LEARN;
-  Serial.println(F("Type y + ENTER to enter fast-learning mode, anything else cancels."));
+  Serial.println(F("Type y + ENTER to confirm, anything else cancels."));
 #else
-  Serial.println(F("learn is disabled in this build."));
-  Serial.println(F("The app shows 'Unsupported' for self-learning when the ECU software number is >= 400000000;"));
-  Serial.println(F("yours is about 402 million, so the app's learning screen was never written for it."));
-  Serial.println(F("Use lw to watch the ECU's learning state read-only."));
+  Serial.println(F("learn is not built into this sketch (ENABLE_LEARN 0)"));
 #endif
 }
 
 void enterLearn() {
   if (!daqValid || daqLen < 150) { Serial.println(F("no live data yet - try again")); return; }
   uint8_t pl[1] = { 0x13 };
-  if (!ackWrite(0x05, pl, 1, F("enter fast-learning mode"))) return;
-  learnMonitor();
+  if (!ackWrite(0x05, pl, 1, F("enter fast-learning mode"))) { Serial.println(F("fast-learning start failed - no acknowledgement")); return; }
+  Serial.println(F("ENTERED - fast-learning requested. Watch ecu_mode (2 = learning), learn_point and learn_state in the live log."));
 }
 
 // Clear the stored fault codes/history (the original app's "clear historical fault code").
@@ -625,7 +636,7 @@ void doClear() {
 }
 
 void help() {
-  Serial.println(F("c | r | d | x | l | tps | lw | same | idle N | limit N | mode N | fuelon | fuel F | clear | h   (then ENTER)"));
+  Serial.println(F("c | r | d | x | l | tps | lw | same | idle N | limit N | mode N | fuelon | fuel F | clear | learn | h   (then ENTER)"));
 }
 
 void handleLine(char *s) {
@@ -644,7 +655,7 @@ void handleLine(char *s) {
   else if (!strcmp(s, "x")) dumpDaq();
   else if (!strcmp(s, "l")) {
     liveOn = !liveOn;
-    if (liveOn) Serial.println(F("ms,rpm,throttle,m2,m3,m4,m5,o2_mV,battery,intake_air,cyl_head,runmode,locked"));
+    if (liveOn) Serial.println(F("ms,rpm,throttle,m2,m3,m4,m5,o2_mV,battery,intake_air,cyl_head,runmode,locked,ecu_mode,learn_point,learn_state"));
   }
   else if (!strcmp(s, "h")) help();
   else if (!strcmp(s, "same")) propose(A_SAME);
@@ -690,7 +701,7 @@ void setup() {
   Serial.begin(SERIAL_BAUD);
   SPI.begin();
   startBus();
-  Serial.println(F("ROJO tuner v3.5. Request 0x201, reply 0x200, 500 kbps"));
+  Serial.println(F("ROJO tuner v3.6. Request 0x201, reply 0x200, 500 kbps"));
   for (uint8_t t = 0; t < 4 && protVer == 0; t++) {   // first Connect after a reset is often missed
     delay(300);
     doConnect();
