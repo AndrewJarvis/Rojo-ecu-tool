@@ -3,7 +3,7 @@ Tuning and diagnostic tool for rojo E5 ECU'S. Uses arduino and can bus module
 
 1. What you need
 
-An Arduino Nano (5 V, ATmega328P) and an MCP2515 CAN module (the common blue board with an 8 MHz crystal), jumper wires, and access to the bike's ECU connector.
+  An Arduino Nano (5 V, ATmega328P) and an MCP2515 CAN module (the common blue board with an 8 MHz crystal), jumper wires, and access to the bike's ECU connector.
 A USB cable that carries data (not a charge-only lead).
 A computer running Google Chrome or Microsoft Edge - Windows, Linux or Mac. Firefox and Safari cannot use serial ports.
 Tested on: ECU model SX-W125-M-210416, software number 402212071, CAN at 500 kbps. Other ROJO ECUs may behave differently.
