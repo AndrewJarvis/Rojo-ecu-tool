@@ -125,7 +125,7 @@ const REPO_URL = 'https://github.com/AndrewJarvis/Rojo-ecu-tool/tree/main';
 
 const DONATE = {
   message: 'If this saved you a trip to the dealer, a donation is very welcome. It is entirely optional.',
-  paypal: 'https://www.paypal.me/AndrewJarvis937',          // e.g. 'https://www.paypal.com/paypalme/YourName'
+  paypal: '',          // e.g. 'https://www.paypal.com/paypalme/YourName'
   crypto: [            // e.g. { coin: 'Bitcoin (BTC)', address: 'bc1q...' }, { coin: 'Ethereum (ETH)', address: '0x...' }
   ]
 };
@@ -161,12 +161,13 @@ const DONATE = {
       <div class="tile big"><div class="k">Engine speed</div><div class="v"><span id="vRpm">–</span><span class="u">rpm</span></div></div>
       <div class="tile"><div class="k">Throttle</div><div class="v"><span id="vThr">–</span><span class="u">%</span></div><div class="bar"><i id="barThr"></i></div></div>
       <div class="tile"><div class="k">Fuel factor (setting)</div><div class="v"><span id="vFuel">–</span></div><div class="hint">1.000 = unchanged · from last read</div></div>
-      <div class="tile"><div class="k">Fuel correction (?)</div><div class="v"><span id="vCorr">–</span></div><div class="hint">live · moves with throttle</div></div>
+      <div class="tile"><div class="k">Injection quantity (?)</div><div class="v"><span id="vInj">–</span></div><div class="hint">moves with throttle · unit unknown</div></div>
+      <div class="tile"><div class="k">Lambda / O2 correction (?)</div><div class="v"><span id="vCorr">–</span></div><div class="hint">live · best guess</div></div>
       <div class="tile"><div class="k">Battery</div><div class="v"><span id="vBat">–</span><span class="u">V</span></div></div>
       <div class="tile"><div class="k">Cylinder head</div><div class="v"><span id="vHead">–</span><span class="u">°C</span></div></div>
       <div class="tile"><div class="k">Intake air (?)</div><div class="v"><span id="vAir">–</span><span class="u">°C</span></div></div>
       <div class="tile"><div class="k">O2 sensor</div><div class="v"><span id="vO2">–</span><span class="u">mV</span></div></div>
-      <div class="tile"><div class="k">Ignition angle (?)</div><div class="v"><span id="vIgn">–</span><span class="u">°</span></div></div>
+      <div class="tile"><div class="k">Ignition angle</div><div class="v"><span id="vIgn">–</span><span class="u">°</span></div></div>
       <div class="tile"><div class="k">Run mode</div><div class="v" style="font-size:18px"><span id="vMode">–</span></div></div>
       <div class="tile"><div class="k">ECU lock</div><div class="v" style="font-size:18px"><span id="vLock">–</span></div></div>
     </div>
@@ -196,7 +197,7 @@ const DONATE = {
       <button id="btnLog">Log live data</button>
       <button id="btnDiag">Log everything (diagnostics)</button>
     </div>
-    <div class="hint" style="margin-top:8px"><b>Log live data</b> records engine speed, throttle, temperatures, battery, O2, the fuel factor setting and the rest as a CSV file - press it to start, press again to stop and save. Columns m2 to m5 are values the ECU sends that aren't identified yet (m4 is the live fuel correction and moves with the throttle). <b>Log everything</b> saves one text file for diagnosis: the ECU details, current settings and fault codes, a fresh raw snapshot, and every line exchanged with the Arduino since you connected.</div>
+    <div class="hint" style="margin-top:8px"><b>Log live data</b> records engine speed, throttle, temperatures, battery, O2, the fuel factor setting and the rest as a CSV file - press it to start, press again to stop and save. The injection quantity and lambda/O2 correction columns move with the throttle; their exact meaning and units are best guesses, and m5_acc is not identified. <b>Log everything</b> saves one text file for diagnosis: the ECU details, current settings and fault codes, a fresh raw snapshot, and every line exchanged with the Arduino since you connected.</div>
   </section>
 
   <section class="card c7">
@@ -393,7 +394,7 @@ const DONATE = {
 
   <h3>5. Using the app</h3>
   <ul>
-    <li><b>Live data:</b> engine speed, throttle, battery, cylinder head temperature, O2 sensor, run mode and lock state, including two fuel numbers: <b>Fuel factor (setting)</b> is the value you can change (from the last read, it does not move with the throttle), and <b>Fuel correction (?)</b> is a live value the ECU sends that moves when the throttle moves; what exactly it is has not been confirmed. Labels with (?) are best guesses.</li>
+    <li><b>Live data:</b> engine speed, throttle, battery, cylinder head temperature, O2 sensor, run mode and lock state, including <b>Fuel factor (setting)</b>, the value you can change (from the last read; it does not move with the throttle). The original app names its ten gauges: engine speed, throttle, fuel (injection) quantity, ignition angle, lambda, "acc", O2 sensor, voltage, intake air temperature and cylinder head temperature. <b>Injection quantity</b> and <b>Lambda / O2 correction</b> move with the throttle; their exact meaning and units have not been confirmed. Labels with (?) are best guesses.</li>
     <li><b>Read from ECU:</b> shows what the ECU currently has. The first time an ECU is read, its idle, rev limit and mode are saved as your <b>baseline</b>.</li>
     <li><b>Write changes…:</b> change the boxes, press the button, check the list in the confirmation window, confirm. The app writes, re-reads, and tells you if the ECU reports the new values (verified).</li>
     <li><b>Write-back test:</b> writes the values the ECU already has. Nothing should change. Run it first to prove the write path works.</li>
@@ -462,7 +463,7 @@ const DONATE = {
 // ==== LOGIC BEGIN (no DOM in here, so it can be tested outside the browser) =============================
 const LIMITS = { idle: [1200, 2000], limit: [3000, 10000], mode: [0, 2], fuel: [1, 3] };
 const MODE_NAMES = ['Comfort', 'Sport', 'Competition'];
-const LIVE_HEADER = 'time,ms,rpm,throttle,m2,m3,m4,m5,o2_mV,battery,intake_air,cyl_head,runmode,locked,fuel_factor,ecu_mode,learn_point,learn_state';
+const LIVE_HEADER = 'time,ms,rpm,throttle,inj_quantity,ign_angle,lambda_corr,m5_acc,o2_mV,battery,intake_air,cyl_head,runmode,locked,fuel_factor,ecu_mode,learn_point,learn_state';
 const modeName = (m) => (m == null ? '?' : m + ' ' + (MODE_NAMES[m] || ''));
 
 const FAULT_TEXT = {
@@ -872,7 +873,7 @@ function buildDiagnosticsText(info) {
   L.push('');
   L.push('== Last live values ==');
   const lv = s.live;
-  L.push(lv ? 'rpm ' + lv.rpm + ', throttle ' + lv.throttle + ' %, battery ' + lv.battery + ' V, head ' + lv.head + ' C, intake ' + lv.intake + ' C, O2 ' + lv.o2 + ' mV, ign ' + lv.m3 + ', m2 ' + lv.m2 + ', m4 ' + lv.m4 + ', m5 ' + lv.m5 + ', mode ' + lv.mode + ', locked ' + lv.locked + (lv.ecuMode != null ? ', ecu mode ' + lv.ecuMode + ', learn point ' + lv.learnPt + ', learn state ' + lv.learnSt : '') : '-');
+  L.push(lv ? 'rpm ' + lv.rpm + ', throttle ' + lv.throttle + ' %, battery ' + lv.battery + ' V, head ' + lv.head + ' C, intake ' + lv.intake + ' C, O2 ' + lv.o2 + ' mV, ignition angle ' + lv.m3 + ', injection quantity ' + lv.m2 + ', lambda/O2 correction ' + lv.m4 + ', m5 ' + lv.m5 + ', mode ' + lv.mode + ', locked ' + lv.locked + (lv.ecuMode != null ? ', ecu mode ' + lv.ecuMode + ', learn point ' + lv.learnPt + ', learn state ' + lv.learnSt : '') : '-');
   L.push('');
   L.push('== Everything exchanged with the Arduino (">>" = sent by the app, other lines = received) ==');
   (info.logLines || []).forEach((x) => L.push(x));
@@ -1017,6 +1018,7 @@ function render() {
   $('barThr').style.width = live ? Math.max(0, Math.min(100, live.throttle)) + '%' : '0';
   $('vFuel').textContent = s && s.fuel != null ? s.fuel.toFixed(3) : '–';
   $('vCorr').textContent = live ? fmt(live.m4, 4) : '–';
+  $('vInj').textContent = live ? fmt(live.m2, 3) : '–';
   $('vBat').textContent = live ? fmt(live.battery, 2) : '–';
   $('vHead').textContent = live ? fmt(live.head, 1) : '–';
   $('vAir').textContent = live ? fmt(live.intake, 1) : '–';
@@ -1024,7 +1026,7 @@ function render() {
   $('vIgn').textContent = live ? fmt(live.m3, 1) : '–';
   $('vMode').textContent = live ? modeName(live.mode) : '–';
   $('vLock').textContent = live ? (live.locked === 1 ? 'locked' : 'unlocked') : '–';
-  $('vOther').textContent = live ? ('m2 ' + fmt(live.m2, 3) + ' · m5 ' + fmt(live.m5, 3)) : '–';
+  $('vOther').textContent = live ? ('m5 (the original app\'s "acc" gauge) ' + fmt(live.m5, 3)) : '–';
 
   $('kModel').textContent = s && s.model ? s.model : '–';
   $('ecuInfo').textContent = s && s.model ? s.model : '';
